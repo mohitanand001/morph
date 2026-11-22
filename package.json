@@ -1,7 +1,7 @@
 {
   "name": "morph",
   "productName": "Morph",
-  "version": "0.15.0-rc.1",
+  "version": "0.15.0-rc.2",
   "description": "Copy from Slack, Jira, Confluence, Outlook, Docs, spreadsheets, AI chats or a terminal, and paste correctly anywhere.",
   "main": "main.js",
   "author": "Morph",

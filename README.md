@@ -4,7 +4,7 @@ Copy from Slack, Jira, Confluence, Outlook, Google Docs, a spreadsheet, an AI ch
 
 Morph is a small background program for the GNOME desktop on Linux. It re-shapes what you copy for the app you paste into, so tables stay tables, lists stay lists and code keeps its indentation.
 
-> **Status: release candidate (0.15.0-rc.1).** It is being tested. Expect rough edges and please report them.
+> **Status: release candidate.** It is being tested. Expect rough edges and please report them.
 
 ## Install
 
