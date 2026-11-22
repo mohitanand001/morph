@@ -185,7 +185,7 @@ check('the source card shows the copied-from app\'s own logo (both renderers)', 
   check('every icon the settings ask for has a drawing in the helper', missing.length === 0, missing.join());
 }
 check('the helper ships a loader so updates need no log out', /FB-LOADER/.test(read(ext + '/loader.js')) && /import\('file:\/\//.test(read(ext + '/loader.js')) && /loader\.js/.test(read('bin/morph')));
-check('PDF file names never come from the copied text', !/doc\.title/.test(read('daemon/gjs-main.js')) && /Morph ' \+ GLib\.DateTime/.test(read('daemon/gjs-main.js')));
+check('PDF file names never come from the copied text', !/doc\.title/.test(read('daemon/gjs-main.js')) && /'Morph_' \+ GLib\.DateTime/.test(read('daemon/gjs-main.js')));
 {
   const main = read('daemon/gjs-main.js'), core = read('daemon/core.js');
   const logs = [...(main + core).matchAll(/\b(?:log|warn)\(([^;\n]*)/g)].map((m) => m[1]);
@@ -227,5 +227,6 @@ check('the top-bar tray icon is optional (off by default on Linux) with a toggle
   check('the demo names apps exactly as the app does', obj(demo, 'SHORT') === obj(core, 'OPTION_LABEL'), obj(demo, 'SHORT') + ' vs ' + obj(core, 'OPTION_LABEL'));
   check('site and README use the app\'s wording (Image tables, no "says so", no ✕ that hides)', !/Tables from images|table OCR|Enable table OCR|Settings → Images\b|and says so|hid Morph with the ✕|pastes fixed|never takes focus|1 GB/.test(site + readme) && /Image tables/.test(site) && /Image tables/.test(readme));
 }
+check('PDF names have no spaces: Morph_<date>_<time>.pdf, then _2', /'Morph_' \+ GLib\.DateTime\.new_now_local\(\)\.format\('%Y-%m-%d_%H\.%M\.%S'\)/.test(read('daemon/gjs-main.js')) && /base \+ '_' \+ i \+ '\.pdf'/.test(read('daemon/gjs-main.js')));
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed (static)');
 process.exit(failed ? 1 : 0);

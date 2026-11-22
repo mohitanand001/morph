@@ -111,9 +111,10 @@ async function savePdf(doc) {
     const dir = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD) || GLib.build_filenamev([GLib.get_home_dir(), 'Downloads']);
     GLib.mkdir_with_parents(dir, 0o755);
     // The file name never comes from what was copied (it could be huge, or look like a command): date and time only.
-    const base = 'Morph ' + GLib.DateTime.new_now_local().format('%Y-%m-%d %H.%M.%S');
+    // No spaces in the name: Morph_2026-11-22_23.19.05.pdf (then _2, _3… if one already exists).
+    const base = 'Morph_' + GLib.DateTime.new_now_local().format('%Y-%m-%d_%H.%M.%S');
     let name = base + '.pdf';
-    for (let i = 2; GLib.file_test(GLib.build_filenamev([dir, name]), GLib.FileTest.EXISTS) && i < 100; i++) name = base + ' (' + i + ').pdf';
+    for (let i = 2; GLib.file_test(GLib.build_filenamev([dir, name]), GLib.FileTest.EXISTS) && i < 100; i++) name = base + '_' + i + '.pdf';
     const path = GLib.build_filenamev([dir, name]);
     renderPdf(items, path);
     log('saved PDF:', path);
