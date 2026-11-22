@@ -96,7 +96,7 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
 <header>
   <div class="mark"><i><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h167q11-35 43-57.5t70-22.5q40 0 71.5 22.5T594-840h166q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm80-80h400v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm200-190q13 0 21.5-8.5T510-820q0-13-8.5-21.5T480-850q-13 0-21.5 8.5T450-820q0 13 8.5 21.5T480-790Z"/></svg></i>Morph</div>
   <h1>Copy once. Paste right, anywhere.</h1>
-  <p class="lede">Morph sits on the edge of your screen and re-shapes what you copied for Slack, Jira, Confluence, Docs, Email, Markdown and more, so tables, lists and code survive the paste. Everything happens on your computer.</p>
+  <p class="lede">Morph sits as a slim tab on the edge of your screen and re-shapes what you copied for Slack, Jira, Confluence, Docs, Email, Markdown and more, so tables, lists and code survive the paste. Everything happens on your computer.</p>
   <div class="term"><pre>curl -fsSL https://mohitanand001.github.io/morph/install.sh | bash</pre><button class="copy" type="button">Copy</button></div>
   <div class="cta">
     <a class="dl" href="try.html">Try it in your browser<small>copy a sample, pick an app, see what pastes</small></a>
@@ -113,7 +113,7 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
 
   <div class="grid">
     <div class="card"><h3>You need</h3><p>Ubuntu, Fedora Workstation or another GNOME desktop, plus <code>curl</code> and <code>unzip</code>. GNOME's <code>gjs</code> is already part of it.</p></div>
-    <div class="card"><h3>What it adds</h3><p>The pill on your screen edge, a small GNOME helper and a <code>morph</code> command. No icon in the top bar.</p></div>
+    <div class="card"><h3>What it adds</h3><p>A slim tab on your screen edge, a small GNOME helper and a <code>morph</code> command. No icon in the top bar.</p></div>
     <div class="card"><h3>What it reads</h3><p>Your copies and the front window's app name, only on your computer. Password managers are never read. Nothing is sent anywhere.</p></div>
   </div>
 
@@ -137,10 +137,10 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
 
 <section id="use">
   <h2>Use it</h2>
-  <p class="sub">The pill never takes focus, so the paste lands where you were.</p>
+  <p class="sub">Morph never takes focus, so the paste lands where you were.</p>
   <div class="step"><div class="n">1</div><div class="body"><h3>Copy as usual</h3><p>From a spreadsheet, Slack, a web page, an AI chat, a terminal or a PDF.</p></div></div>
   <div class="step"><div class="n">2</div><div class="body"><h3>Pick where it's going</h3><p>Click the tab on the screen edge (or press <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>F</kbd>) and choose the app you're pasting into.</p></div></div>
-  <div class="step"><div class="n">3</div><div class="body"><h3>Paste</h3><p>Press <kbd>Ctrl</kbd> <kbd>V</kbd>. Not right? Press <b>Undo</b> on the pill to put your original back. Or skip the pill entirely: <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>V</kbd> pastes fixed for the app you're in.</p></div></div>
+  <div class="step"><div class="n">3</div><div class="body"><h3>Paste</h3><p>Press <kbd>Ctrl</kbd> <kbd>V</kbd>. Not right? Press <b>Undo</b> in Morph to put your original back. Or skip a click entirely: <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>V</kbd> pastes fixed for the app you're in.</p></div></div>
   <div class="grid two">
     <div class="card"><h3>Tables</h3><p>Spreadsheet ranges, Slack text tables, psql output and web tables become real tables in Jira, Confluence, email and Docs.</p></div>
     <div class="card"><h3>Lists</h3><p>Odd bullets, a) b) numbering and Outlook's fake lists become proper nested lists.</p></div>
@@ -168,23 +168,23 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
 
 <section id="update">
   <h2>Update</h2>
-  <p class="sub">Morph checks this page once a day (you can turn that off in Settings → Updates). To check yourself, open the pill, then Settings, then <b>Updates</b>. When there's a newer version, <b>Update now</b> installs it and restarts Morph, with no log out. Or from a terminal:</p>
+  <p class="sub">Morph checks this page once a day (you can turn that off in Settings → Updates). To check yourself, open Morph, then Settings, then <b>Updates</b>. When there's a newer version, <b>Update now</b> installs it and restarts Morph, with no log out. Or from a terminal:</p>
   <div class="term"><pre>morph --update</pre><button class="copy" type="button">Copy</button></div>
 </section>
 
 <section id="uninstall">
   <h2>Uninstall</h2>
-  <p class="sub">Open the pill, then Settings, then <b>Uninstall</b>, or run the command below. It removes everything: the program, the GNOME helper, start-at-login, the command, your settings, logs, caches and the optional OCR files. Installed from the .deb? Run <code>sudo apt remove --purge morph</code>.</p>
+  <p class="sub">Open Morph, then Settings, then <b>Uninstall</b>, or run the command below. It removes everything: the program, the GNOME helper, start-at-login, the command, your settings, logs, caches and the optional OCR files. Installed from the .deb? Run <code>sudo apt remove --purge morph</code>.</p>
   <div class="term"><pre>morph --uninstall</pre><button class="copy" type="button">Copy</button></div>
 </section>
 
 <section id="help">
   <h2>Troubleshooting</h2>
-  <details><summary>The welcome or the pill doesn't appear</summary><div class="in">
+  <details><summary>The welcome or the tab doesn't appear</summary><div class="in">
     <p>Run <code>morph --status</code>. If the app is running but nothing shows, switch the GNOME helper off and on: <code>gnome-extensions disable morph-focus@morph.dev; gnome-extensions enable morph-focus@morph.dev</code>.</p>
     <p>To see the welcome again, run <code>morph --setup</code>.</p></div></details>
-  <details><summary>The pill says "Skipped on purpose"</summary><div class="in"><p>You set Morph to work in only some apps, and you copied from another one. Pick an app in the pill to convert it anyway, or switch on <b>All apps</b> in Settings → Apps.</p></div></details>
-  <details><summary>I closed the pill with the ✕</summary><div class="in"><p>Press <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>F</kbd>, or run <code>morph --restart</code>.</p></div></details>
+  <details><summary>Morph says "Not read"</summary><div class="in"><p>You set Morph to work in only some apps, and you copied from another one. Pick an app in Morph to convert it anyway, or switch on <b>All apps</b> in Settings → Apps.</p></div></details>
+  <details><summary>I hid Morph with the ✕</summary><div class="in"><p>Press <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>F</kbd>, or run <code>morph --restart</code>.</p></div></details>
   <details><summary>"gjs is missing"</summary><div class="in"><p>It's part of GNOME, so this is rare. On Ubuntu run <code>sudo apt install gjs</code>, on Fedora <code>sudo dnf install gjs</code>.</p></div></details>
   <details><summary>Where does it log?</summary><div class="in"><p>In <code>~/.cache/morph.log</code>. It never contains what you copied. For more detail, run <code>morph --stop</code>, then <code>FB_DEBUG=1 gjs -m ~/.local/share/morph/daemon/gjs-main.js</code> in a terminal.</p></div></details>
   <details><summary>Report a problem</summary><div class="in"><p><a href="https://github.com/mohitanand001/morph/issues/new/choose">Open an issue on GitHub</a> with the two apps involved, what you copied and what you got, plus the output of <code>morph --status</code>. For security problems, use the <a href="https://github.com/mohitanand001/morph/security/policy">security policy</a> instead.</p></div></details>

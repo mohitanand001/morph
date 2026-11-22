@@ -138,9 +138,11 @@
 .fb-applist { spacing: 4px; }
 .fb-app-row { padding: 5px 8px; border: 1px solid #e7ddc0; border-radius: 10px; background-color: #fdf6e3; }
 .fb-app-row:hover { border-color: #ddd3b4; background-color: #f8f1dd; }
-.fb-prog { spacing: 2px; margin: 8px 0 4px 0; }
-.fb-prog-seg { height: 6px; border-radius: 3px; background-color: #e7ddc0; }
+.fb-prog { spacing: 0; margin: 8px 0 4px 0; }
+.fb-prog-seg { height: 6px; border-radius: 0; background-color: #e7ddc0; }
 .fb-prog-seg.fb-on { background-color: #2aa198; }
+.fb-prog-seg.fb-first { border-radius: 3px 0 0 3px; }
+.fb-prog-seg.fb-last { border-radius: 0 3px 3px 0; }
 .fb-app-box { spacing: 8px; }
 .fb-app-name { font-size: 12.5px; font-weight: 500; color: #0a3a45; }
 .fb-app-row.fb-off .fb-app-name { color: #93a1a1; }

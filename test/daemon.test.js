@@ -207,7 +207,7 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
     c.action('view:keys');
     await settle();
     const keys = d.last().pane.keys;
-    check('a taken shortcut is marked', keys.length === 5 && keys.find((k) => k.label === 'Open the pill').note === 'Taken by another app');
+    check('a taken shortcut is marked', keys.length === 5 && keys.find((k) => k.label === 'Show or hide Morph').note === 'Taken by another app');
   }
   // --- PDF
   {

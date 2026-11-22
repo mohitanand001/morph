@@ -284,7 +284,7 @@ function createCore(io) {
       { id: 'edit', label: 'Apps', icon: 'grid_view' },
       { id: 'keys', label: 'Shortcuts', icon: 'keyboard' },
       { id: 'privacy', label: 'Privacy', icon: 'lock' },
-      ...(shellVersion >= 15 ? [{ id: 'ocr', label: 'Image tables', icon: 'image' }] : []),
+      ...(shellVersion >= 15 ? [{ id: 'ocr', label: 'Images', icon: 'image' }] : []),
       { id: 'size', label: 'Size', icon: 'aspect_ratio' },
       ...(shellVersion >= 12 ? [{ id: 'updates', label: 'Updates', icon: 'refresh' }, { id: 'uninstall', label: 'Uninstall', icon: 'delete' }] : []),
       { id: 'about', label: 'About', icon: 'info' },
@@ -303,7 +303,7 @@ function createCore(io) {
         apps: setupApps().map((r) => ({ label: r.name, dest: logoOf(r), sw: on ? 'none' : (r.enabled ? 'on' : 'off'), action: on ? '' : 'rule:' + r.id })),
         keepOrder: true };
     } else if (cur === 'keys') {
-      const KEY_SHORT = { paste: 'Paste, fixed', plain: 'Paste as plain text', pill: 'Open the pill', auto: 'Auto-format on/off', pdf: 'Save as PDF' };
+      const KEY_SHORT = { paste: 'Paste, fixed', plain: 'Paste as plain text', pill: 'Show or hide Morph', auto: 'Auto-format on/off', pdf: 'Save as PDF' };
       const KEY_ICON = { paste: 'content_paste', plain: 'notes', pill: 'grid_view', auto: 'bolt', pdf: 'description' };
       spec.pane = { title: 'Shortcuts', lede: 'Click a shortcut to turn it on or off.',
         keys: shortcutsForSettings().map((k, i) => ({ label: KEY_SHORT[k.id] || k.name, icon: KEY_ICON[k.id] || 'keyboard', keys: k.label.split(' ').filter(Boolean).slice(0, 5), sw: sw(k.on && !k.taken), note: k.taken ? 'Taken by another app' : '', action: 'key:' + i })) };
@@ -354,7 +354,7 @@ function createCore(io) {
             'Your Morph settings: chosen apps, order, size and shortcuts',
             'Morph log files',
             'Start at login',
-            'The pill (its GNOME helper)',
+            'The tab on the screen edge (its GNOME helper)',
             'The morph command' ] },
           { kind: 'panel', tone: 'warn', icon: 'warning', title: 'This deletes your Morph settings', text: 'Nothing you copy is ever stored by Morph, so there is no clipboard data to lose. Your documents and other files are not touched.' },
           { kind: 'buttons', buttons: io.uninstall ? [
@@ -378,8 +378,8 @@ function createCore(io) {
     } else {
       spec.pane = { title: 'General', lede: 'How ' + APP_NAME + ' behaves when you copy.',
         opts: [
-          { icon: 'bolt', label: 'Convert automatically', sub: 'Converts a copy when you switch to one of your apps', sw: sw(settings.autoFormat), action: 'toggle:auto' },
-          { icon: 'grid_view', label: 'Quick buttons on the tab', sub: 'App buttons on the closed pill: one click converts', sw: sw(settings.tabIcons), action: 'toggle:tabicons' },
+          { icon: 'bolt', label: 'Convert automatically', sub: 'Converts a copy when you switch apps', sw: sw(settings.autoFormat), action: 'toggle:auto' },
+          { icon: 'grid_view', label: 'Quick buttons on the tab', sub: 'One-click app buttons on the closed tab', sw: sw(settings.tabIcons), action: 'toggle:tabicons' },
         ] };
       if (shellVersion < 12) {
         // An older helper only draws switches: keep the old two-click rows until it is updated.
@@ -434,7 +434,7 @@ function createCore(io) {
       view: 'main',
       gear: 'view:settings',
       source: copy ? { icon: /table/i.test(copy.what || '') ? 'table' : 'content_paste', dest: place ? place.dest : '', title: 'Copied from ' + (place ? place.tool : copy.from), sub: [place ? place.where : '', copy.what].filter(Boolean).join(' · ') }
-        : skipped ? { icon: 'lock', title: lastSkip.pm ? 'Password manager: skipped' : 'Skipped on purpose', sub: lastSkip.pm ? 'Morph never reads copies from password managers.' : 'Copied from ' + lastSkip.app + ', which is not one of your apps, so Morph did not read it. Pick an app below to convert it, or turn on "All apps" in Settings, Apps.' }
+        : skipped ? { icon: 'lock', title: 'Copied from ' + lastSkip.app, sub: lastSkip.pm ? 'Never read: a password manager' : 'Not read: ' + lastSkip.app + ' is off in Settings → Apps' }
         : imageOnly ? { icon: 'image', title: 'Image copied', sub: 'Nothing to convert. Paste it as it is.' }
         : { icon: 'content_paste', title: 'Nothing copied yet', sub: 'Copy something to start' },
       links: [],
@@ -602,7 +602,7 @@ function createCore(io) {
     }
     if (from === 'pill') {
       if (r.ok) autoDoneDest = r.restored ? null : pendingDest;
-      flash = r.ok ? { sub: r.restored ? 'Your original is back on the clipboard. Paste it as you copied it.' : r.fromImage ? 'Read from an image: check the numbers.' : '', tone: 'ok', collapse: false } : { sub: r.note || (copySummary() ? 'Couldn’t convert that.' : ''), tone: 'warn', collapse: false };
+      flash = r.ok ? { sub: r.restored ? 'Original is back on the clipboard.' : r.fromImage ? 'Read from an image: check the numbers.' : '', tone: 'ok', collapse: false } : { sub: r.note || (copySummary() ? 'Couldn’t convert that.' : ''), tone: 'warn', collapse: false };
       if (r.ok) startTick(r.restored ? 'original' : pendingDest); else sendPill();
       return;
     }
@@ -842,7 +842,7 @@ function createCore(io) {
     sendPill();
     const keys = settings.shortcuts.find((k) => k.id === 'pill');
     const how = keys && keys.on ? accelLabel(keys.accel, false) : 'logging out and in again';
-    io.notify(APP_NAME + ' pill hidden', 'Bring it back with ' + how + '.');
+    io.notify(APP_NAME + ' is hidden', 'Bring it back with ' + how + '.');
   }
 
   // ---------------------------------------------------------------- PDF
@@ -884,7 +884,7 @@ function createCore(io) {
       if (settings.notifiedVersion !== updateInfo.version) {
         settings.notifiedVersion = updateInfo.version;
         save();
-        io.notify(APP_NAME + ' ' + updateInfo.version + ' is available', 'Open the pill, then Settings, Updates, and choose Update now.');
+        io.notify(APP_NAME + ' ' + updateInfo.version + ' is available', 'Open Morph, then Settings, Updates, and choose Update now.');
       }
     } else if (info) updateInfo = null;
     sendPill();
@@ -927,7 +927,7 @@ function createCore(io) {
     }
     confirmUninstall = false;
     io.clearTimeout(confirmTimer);
-    io.notify('Removing ' + APP_NAME, 'The pill will disappear.');
+    io.notify('Removing ' + APP_NAME, 'The tab will disappear.');
     let ok = false;
     try { ok = await io.uninstall.run(); } catch (e) { ok = false; }
     if (!ok) io.notify('Could not uninstall', 'Run morph --purge in a terminal instead.');

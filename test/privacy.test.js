@@ -35,7 +35,7 @@ function desk(saved) {
     c.focus({ app: 'gnome-terminal-server', title: 'bash' }, 23);
     check('…including apps that are not one of the ten', c.mayRead() === true);
     c.focus({ app: '1password', title: '1Password' }, 23);
-    check('password managers are never read', c.mayRead() === false && /Password manager/.test(d.last().source.title));
+    check('password managers are never read', c.mayRead() === false && /Copied from 1password/i.test(d.last().source.title) && /password manager/.test(d.last().source.sub));
     c.focus({ app: 'org.keepassxc.KeePassXC', title: 'Passwords - KeePassXC' }, 23);
     check('KeePassXC is skipped too', c.mayRead() === false);
     c.focus({ app: 'slack', title: 'x - Slack' }, 23);
@@ -81,7 +81,7 @@ function desk(saved) {
     c.focus({ app: 'gnome-terminal-server', title: 'bash' }, 23);
     check('Only these apps: a copy from another app is not read', c.mayRead() === false && d.reads === 1);
     const sp = d.last();
-    check('skipped copy: says why and how to change it', sp.source.title === 'Skipped on purpose' && /not one of your apps/.test(sp.source.sub) && /"All apps" in Settings, Apps/.test(sp.source.sub));
+    check('skipped copy: says where it came from, that it was not read, and where to change it', sp.source.title === 'Copied from Terminal' && sp.source.sub === 'Not read: Terminal is off in Settings → Apps');
     check('skipped copy: an app can still be picked (a click is you asking)', JSON.stringify(sp).includes('"action":"fix:'));
     c.action('rule:terminal');
     check('switching Terminal on makes terminal copies readable', c.mayRead() === true);

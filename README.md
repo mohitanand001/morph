@@ -26,7 +26,7 @@ You can read the installer first: [`site/install.sh`](site/install.sh).
 - **Destination-aware copy**: each destination gets the format it understands. Pairs that already paste fine are passed through untouched, and Morph says so.
 - **Lists and indentation**: odd bullets, `a) b)` numbering, mixed tabs and spaces and Outlook's fake lists become real nested lists.
 - **Terminal output** and **PDF text** are cleaned up too.
-- **A pill** on the screen edge shows what you copied and offers the apps to convert it for. Click an app, then paste with Ctrl+V.
+- **A slim tab** on the screen edge opens Morph, which shows what you copied and offers the apps to convert it for. Click an app, then paste with Ctrl+V.
 - **Optional table OCR**: reads a table from a copied image, on your device, only when you click. Turn it on in Settings, Privacy (a ~1 GB install of PaddleOCR).
 
 ## Privacy

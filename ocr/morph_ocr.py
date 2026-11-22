@@ -13,7 +13,8 @@ import os
 import re
 import sys
 
-os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")  # after the warm-up, no network checks
+if "--warmup" not in sys.argv:  # after the warm-up, no network checks
+    os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 
 TABLE_KEYS = ("pred_html", "html")
 MAX_HTML = 400000
@@ -55,14 +56,36 @@ def count_cells(html):
     return len(re.findall(r"<t[dh]\b", html, re.I))
 
 
+def _make(cls, options):
+    """Build a pipeline with the options this PaddleOCR version knows; drop the ones it does not."""
+    opts = dict(options)
+    while True:
+        try:
+            return cls(**opts)
+        except TypeError as e:
+            bad = next((k for k in opts if k in str(e)), None)
+            if not bad:
+                raise
+            opts.pop(bad)
+
+
 def build_pipeline():
-    try:  # PaddleOCR 3.x
-        from paddleocr import PPStructureV3
-        return "v3", PPStructureV3(use_doc_orientation_classify=False, use_doc_unwarping=False,
-                                   use_seal_recognition=False, use_formula_recognition=False, use_chart_recognition=False)
-    except ImportError:
+    # PaddleOCR 3.x: the table-only pipeline first (fewer models to download), then the full document one.
+    errors = []
+    for name in ("TableRecognitionPipelineV2", "PPStructureV3"):
+        try:
+            mod = __import__("paddleocr", fromlist=[name])
+            cls = getattr(mod, name)
+        except (ImportError, AttributeError) as e:
+            errors.append(str(e))
+            continue
+        return "v3", _make(cls, {"use_doc_orientation_classify": False, "use_doc_unwarping": False,
+                                 "use_seal_recognition": False, "use_formula_recognition": False, "use_chart_recognition": False})
+    try:
         from paddleocr import PPStructure  # PaddleOCR 2.x
-        return "v2", PPStructure(table=True, ocr=True, layout=True, show_log=False)
+    except ImportError:
+        raise RuntimeError("PaddleOCR has no table pipeline here: " + "; ".join(errors)[:150])
+    return "v2", PPStructure(table=True, ocr=True, layout=True, show_log=False)
 
 
 def read_table(path):
