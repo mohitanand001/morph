@@ -47,6 +47,10 @@ function desk(opts) {
     await c.start();
     c.focus({ app: 'slack', title: 'x - Slack' }, 15);
     check('an image copy does not run OCR by itself', d.ocrRuns === 0);
+    {
+      const sp = d.last();
+      check('an image copy with OCR on: the apps can be picked, and the card says so', sp.source.title === 'Image copied' && /Pick an app to read its table/.test(sp.source.sub) && JSON.stringify(sp.options).includes('"action":"fix:jira"'), JSON.stringify(sp.source));
+    }
     c.action('paste:jira');
     await new Promise((r) => setTimeout(r, 30));
     check('picking an app reads the table (once)', d.ocrRuns === 1 && d.writes.length >= 1 && /Bolt/.test(d.writes[d.writes.length - 1].data));

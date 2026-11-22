@@ -404,9 +404,11 @@ function createCore(io) {
     const others = offered.filter((d) => !rule || d !== rule.dest);
     const rows = [];
     const skipped = !copy && /^Not read/.test(clipStatus) && !!lastSkip;
-    const idle = !copy && !skipped; // a skipped copy still lets you pick an app: that click is you asking Morph to read it
-    const imageOnly = idle && (/image$/.test(clipStatus) || /^Image copied/.test(clipStatus));
+    // A copied image with table OCR on: picking an app reads its table, so the apps stay available.
     const ocrBusy = /^Reading the table/.test(clipStatus);
+    const ocrImage = !copy && (ocrBusy || /^Image copied/.test(clipStatus) || /holds an image$/.test(clipStatus)) && ocrReady(); // decided now, not when it was copied
+    const idle = !copy && !skipped && !ocrImage; // a skipped copy still lets you pick an app: that click is you asking Morph to read it
+    const imageOnly = idle && (/image$/.test(clipStatus) || /^Image copied/.test(clipStatus));
     for (let i = 0; i < others.length; i += 2) rows.push(others.slice(i, i + 2).map((d) => (tickDest === d
       ? { label: OPTION_LABEL[d], done: true }
       : idle ? { label: OPTION_LABEL[d], dest: d, off: true }
@@ -438,7 +440,8 @@ function createCore(io) {
       source: copy ? { icon: /table/i.test(copy.what || '') ? 'table' : 'content_paste', dest: place ? place.dest : '', title: 'Copied from ' + (place ? place.tool : copy.from), sub: [place ? place.where : '', copy.what].filter(Boolean).join(' · ') }
         : skipped ? { icon: 'lock', title: 'Copied from ' + lastSkip.app, sub: lastSkip.pm ? 'Never read: a password manager' : 'Not read: ' + lastSkip.app + ' is off in Settings → Apps' }
         : ocrBusy ? { icon: 'image', title: 'Reading the table…', sub: 'Up to a minute the first time' }
-        : imageOnly ? { icon: 'image', title: 'Image copied', sub: ocrNote || 'Nothing to convert. Paste it as it is.' }
+        : ocrImage ? { icon: 'image', title: 'Image copied', sub: ocrNote || 'Pick an app to read its table' }
+        : imageOnly ? { icon: 'image', title: 'Image copied', sub: 'Nothing to convert. Paste it as it is.' }
         : { icon: 'content_paste', title: 'Nothing copied yet', sub: 'Copy something to start' },
       links: [],
       tab: settings.tabIcons ? others.slice(0, 4).map((d) => (tickDest === d
