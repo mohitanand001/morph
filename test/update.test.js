@@ -43,7 +43,8 @@ const general = (d, c) => { c.action('view:settings'); return d.last().pane.opts
     check('no check at the very start (waits a moment)', d.checks === 0);
     d.advance(21000); await settle();
     check('checks shortly after start', d.checks === 1);
-    check('says once that an update is available', d.notes.filter((n) => /0\.14\.0-rc\.9 is available/.test(n.t)).length === 1);
+    c.action('view:main');
+    check('an available update shows as a line in Morph, not a desktop notification', /Version 0\.14\.0-rc\.9 is available · Settings → Updates/.test(d.pills[d.pills.length - 1].note) && d.notes.length === 0);
     const opts = general(d, c);
     check('General offers the update', opts.some((o) => /Update to 0\.14\.0-rc\.9/.test(o.label) && o.action === 'update:'));
     c.action('update:'); await settle();
@@ -52,13 +53,13 @@ const general = (d, c) => { c.action('view:settings'); return d.last().pane.opts
     c.action('update:'); await settle();
     check('a second click does nothing while updating', d.runs === 1);
     d.finish(false); await settle();
-    check('a failed update stops saying Updating… and tells you', !general(d, c).some((o) => o.label === 'Updating…') && d.notes.some((n) => /did not finish/.test(n.t)));
+    check('a failed update stops saying Updating… and tells you, in Morph', !general(d, c).some((o) => o.label === 'Updating…') && d.notes.length === 0);
     const hours = async (n) => { for (let i = 0; i < n; i++) { d.advance(3600 * 1000); await settle(); } };
     await hours(5);
     check('not asked again within a day', d.checks === 1);
     await hours(20);
     check('asked again after a day', d.checks === 2, String(d.checks));
-    check('the same version is not announced twice', d.notes.filter((n) => /is available/.test(n.t)).length === 1);
+    check('no desktop notifications at all', d.notes.length === 0);
   }
   {
     const d = desk(); d.remote = { version: '0.14.0-rc.5' };
@@ -147,7 +148,7 @@ const general = (d, c) => { c.action('view:settings'); return d.last().pane.opts
     d.advance(9000); await settle();
     check('the question goes away by itself', row().label === 'Uninstall Morph');
     c.action('uninstall:'); c.action('uninstall:'); await settle();
-    check('a second click uninstalls, once', d.uninstalls === 1 && d.notes.some((n) => /Removing Morph/.test(n.t)));
+    check('a second click uninstalls, once, without a desktop notification', d.uninstalls === 1 && d.notes.length === 0);
   }
   // --- the real installer script against a pretend website
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-upd-'));

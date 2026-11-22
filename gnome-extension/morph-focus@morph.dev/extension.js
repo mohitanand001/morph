@@ -43,7 +43,7 @@ import { Slider } from 'resource:///org/gnome/shell/ui/slider.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const PILL_VERSION = 27;
+const PILL_VERSION = 28;
 const IFACE = `
 <node>
   <interface name="dev.morph.Focus">
@@ -1312,7 +1312,7 @@ export default class FormatBridgeHelper extends Extension {
     if (!settingsView && s.gear) bar.add_child(this._ib('fb-gear', 'settings', 'Settings', () => this._send(s.gear)));
     const wc = new St.BoxLayout({ style_class: 'fb-wc', y_align: Clutter.ActorAlign.CENTER });
     const tuck = this._ib('fb-tuck', 'remove', 'Tuck away', () => this._setOpen(false));
-    const x = this._ib('fb-x', 'close', 'Close the pill', () => { this._setOpen(false); this._root.visible = false; this._action('hide:'); });
+    const x = this._ib('fb-x', 'close', 'Hide Morph', () => this._action('hide:')); // Morph says how to bring it back, then hides
     wc.add_child(tuck);
     wc.add_child(x);
     bar.add_child(wc);

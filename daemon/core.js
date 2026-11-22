@@ -100,6 +100,10 @@ function createCore(io) {
   let confirmUninstall = false; // older helpers: the Uninstall row was clicked once
   let checking = false;
   let checkFailed = false;      // the last manual check could not reach the website
+  // Everything Morph has to say is said in its own panel, never with a desktop notification.
+  let updateFailed = false;     // the last "Update now" did not finish
+  let uninstallFailed = false;  // the uninstall did not finish
+  let helperHint = false;       // the GNOME helper is too old for the current Settings
   let checkNote = '';           // what the last manual check found
   let confirmTimer = null;
   let readLog = [];           // what Morph read or skipped: time, kind, app, size. Never titles or content. Memory only.
@@ -338,6 +342,7 @@ function createCore(io) {
       let st;
       if (checking) st = { tone: 'plain', icon: 'refresh', title: 'Checking for updates…', text: 'Looking at the Morph website.', button: { label: 'Checking…', action: 'checkupdate:', disabled: true, kind: 'secondary' } };
       else if (updating) st = { tone: 'warn', icon: 'download', title: 'Updating…', text: 'Morph restarts when it is done.', button: { label: 'Updating…', action: 'update:', disabled: true, kind: 'primary' } };
+      else if (updateFailed) st = { tone: 'warn', icon: 'error', title: 'The update did not finish', text: 'Try again, or run morph --update in a terminal.', button: { label: 'Try again', action: 'update:', kind: 'primary' } };
       else if (checkFailed) st = { tone: 'warn', icon: 'error', title: 'Could not check for updates', text: 'Morph could not reach its website. Check your connection and try again.', button: { label: 'Retry', action: 'checkupdate:', kind: 'primary' } };
       else if (updateInfo) st = { tone: 'warn', icon: 'download', title: 'Version ' + updateInfo.version + ' is available', text: 'Updating installs it and restarts Morph.', button: { label: 'Update now', action: 'update:', kind: 'primary' } };
       else st = { tone: 'ok', icon: 'check_circle', title: 'You are up to date', text: 'This is the latest version of Morph.', button: { label: 'Check for updates', action: 'checkupdate:', kind: 'secondary' } };
@@ -348,6 +353,7 @@ function createCore(io) {
     } else if (cur === 'uninstall' && shellVersion >= 13) {
       spec.pane = { title: 'Uninstall Morph', lede: 'Remove Morph from this account.',
         blocks: [
+          ...(uninstallFailed ? [{ kind: 'panel', tone: 'warn', icon: 'error', title: 'Uninstall did not finish', text: 'Run morph --uninstall in a terminal instead.' }] : []),
           { kind: 'text', text: 'Uninstalling stops Morph and removes it from this computer. You can install it again at any time.' },
           { kind: 'panel', tone: 'plain', title: 'What will be removed', items: [
             'The Morph program and its folder',
@@ -450,7 +456,8 @@ function createCore(io) {
         : { label: OPTION_LABEL[d], dest: d, action: 'fix:' + d, color: DEST_COLOR[d] })) : [],
       original: null,
       collapseAfterMs: 0,
-      note: '',
+      // A standing note under the card: an update to install, or a helper to refresh.
+      note: helperHint ? 'Run morph --install to update the GNOME helper' : updateInfo && !updating ? 'Version ' + updateInfo.version + ' is available · Settings → Updates' : '',
       edit: null,
     };
     if (pillView !== 'main') return settingsSpec(spec, pillView);
@@ -616,7 +623,8 @@ function createCore(io) {
       if (r.ok) startTick(r.restored ? 'original' : pendingDest); else sendPill();
       return;
     }
-    io.notify(r.ok ? 'Ready to paste into ' + r.name : 'Nothing to convert', r.ok ? r.summary || '' : 'Copy something first.');
+    flash = r.ok ? { done: '✓ Ready to paste into ' + r.name, sub: r.summary || '', tone: 'ok', open: true, collapse: true } : { sub: 'Nothing to convert yet. Copy something first.', tone: 'warn', open: true, collapse: true };
+    sendPill();
   }
   async function convertTo(dest) {
     try {
@@ -682,7 +690,7 @@ function createCore(io) {
     if (typeof version === 'number') shellVersion = version;
     if (shellVersion > 0 && shellVersion < 13 && !loginHinted && settings.welcomed) {
       loginHinted = true;
-      io.notify('Update the helper', 'Morph updated. Run "morph --install" in a terminal to load the new helper, then the new Settings appear.');
+      helperHint = true;
     }
     if (win === null) { if (shellStatus !== 'unavailable') { shellStatus = 'unavailable'; winNow = null; currentRule = null; sendPill(); } return; }
     shellStatus = 'ok';
@@ -848,11 +856,11 @@ function createCore(io) {
     }
   }
   function hidePill() {
-    settings.pillEnabled = false;
-    sendPill();
     const keys = settings.shortcuts.find((k) => k.id === 'pill');
-    const how = keys && keys.on ? accelLabel(keys.accel, false) : 'logging out and in again';
-    io.notify(APP_NAME + ' is hidden', 'Bring it back with ' + how + '.');
+    const how = keys && keys.on ? accelLabel(keys.accel, false) : 'morph --restart';
+    flash = { sub: 'Hiding. Bring it back with ' + how + '.', tone: 'ok', open: true };
+    sendPill();
+    io.setTimeout(() => { settings.pillEnabled = false; save(); sendPill(); }, 2200);
   }
 
   // ---------------------------------------------------------------- PDF
@@ -868,8 +876,8 @@ function createCore(io) {
     try { res = await io.savePdf({ ast: doc, title: FB.engine.pdfTitle(r.ast) }); } catch (e) { res = null; }
     if (res && res.ok) {
       lastPdf = res.path || '';
+      flash = { sub: 'Saved to Downloads: ' + res.name, tone: 'ok' };
       startTick('pdf');
-      io.notify('Saved ' + res.name, 'In your Downloads folder.');
       return true;
     }
     flash = { sub: 'Couldn’t save the PDF.', tone: 'warn' };
@@ -894,7 +902,6 @@ function createCore(io) {
       if (settings.notifiedVersion !== updateInfo.version) {
         settings.notifiedVersion = updateInfo.version;
         save();
-        io.notify(APP_NAME + ' ' + updateInfo.version + ' is available', 'Open Morph, then Settings, Updates, and choose Update now.');
       }
     } else if (info) updateInfo = null;
     sendPill();
@@ -916,13 +923,14 @@ function createCore(io) {
   async function runUpdate() {
     if (!updateInfo || updating || !io.update) return;
     updating = true;
+    updateFailed = false;
     sendPill();
     let ok = false;
     try { ok = await io.update.run(); } catch (e) { ok = false; }
     // If we are still here, the updater finished without restarting us (or failed): never stay on "Updating…".
     updating = false;
-    if (!ok) io.notify('Update did not finish', 'Try again, or run morph --update in a terminal.');
-    else await checkUpdates(true);
+    updateFailed = !ok;
+    if (ok) await checkUpdates(true);
     sendPill();
   }
   // Two clicks: the first only arms it (and disarms itself after eight seconds).
@@ -937,10 +945,9 @@ function createCore(io) {
     }
     confirmUninstall = false;
     io.clearTimeout(confirmTimer);
-    io.notify('Removing ' + APP_NAME, 'The tab will disappear.');
     let ok = false;
     try { ok = await io.uninstall.run(); } catch (e) { ok = false; }
-    if (!ok) io.notify('Could not uninstall', 'Run morph --purge in a terminal instead.');
+    uninstallFailed = !ok;
     sendPill();
   }
   function scheduleUpdateChecks() {
