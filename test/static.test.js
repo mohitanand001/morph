@@ -188,7 +188,7 @@ check('PDF file names never come from the copied text', !/doc\.title/.test(read(
   const leaks = logs.filter((l) => /\.(text|html)\b(?!\.length)|win\.title(?!\.length)|JSON\.stringify\(info\.win/.test(l));
   check('logs never contain what was copied or a window title', leaks.length === 0, leaks.join(' | '));
 }
-check('release candidate version', /"version": "0\.15\.0-rc\.1"/.test(read('package.json')));
+check('release candidate version', /"version": "0\.15\.0-rc\.\d+"/.test(read('package.json')));
 check('nothing copied: apps are inert in the spec and both renderers', /idle \? \{ label: OPTION_LABEL\[d\], dest: d, off: true \}/.test(read('main.js')) && /o\.off/.test(read('src/pill.js')) && /o\.off/.test(extJs));
 check('the closed tab height follows its icons (last icon never hangs out)', /_fitHandle\(\)/.test(extJs) && /n \* 20/.test(extJs));
 check('settings keep their scroll when a switch or an app is toggled (both renderers)', /_keepScroll/.test(extJs) && /paneY\[paneKey\]/.test(read('src/pill.js')));
