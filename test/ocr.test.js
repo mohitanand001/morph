@@ -125,17 +125,17 @@ function desk(opts) {
     c.focus({ app: 'slack', title: 'x - Slack' }, 15);
     c.action('view:settings'); c.action('view:ocr');
     const blocks = () => JSON.stringify(d.last().pane.blocks);
-    check('off: the pane offers an Enable table OCR button', /Enable table OCR/.test(blocks()) && /ocr:ask/.test(blocks()) && !/confirm/.test(blocks()));
+    check('off: the pane offers an Enable table OCR button', /Turn on image tables/.test(blocks()) && /ocr:ask/.test(blocks()) && !/confirm/.test(blocks()));
     c.action('ocr:ask');
     check('asking happens inside Morph: about 400 MB, Install or Not now', /Download about 400 MB/.test(blocks()) && /RapidOCR/.test(blocks()) && /"Install"/.test(blocks()) && /Not now/.test(blocks()) && /ocr:on/.test(blocks()));
     c.action('ocr:no');
-    check('Not now goes back, nothing installed', /Enable table OCR/.test(blocks()) && !state.starts);
+    check('Not now goes back, nothing installed', /Turn on image tables/.test(blocks()) && !state.starts);
     c.action('ocr:ask'); c.action('ocr:on');
-    check('installing: progress is shown, with Stop installing', /Installing table OCR/.test(blocks()) && /Stop installing/.test(blocks()) && /ocr:askstop/.test(blocks()) && !/Enable table OCR/.test(blocks()));
+    check('installing: progress is shown, with Stop installing', /Installing image tables/.test(blocks()) && /Stop installing/.test(blocks()) && /ocr:askstop/.test(blocks()) && !/Turn on image tables/.test(blocks()));
     c.action('ocr:askstop');
     check('Stop installing asks first, in the pill', /Stop installing\?/.test(blocks()) && /Keep installing/.test(blocks()));
     c.action('ocr:no');
-    check('Keep installing goes back to the progress', /Installing table OCR/.test(blocks()) && !state.cancelled);
+    check('Keep installing goes back to the progress', /Installing image tables/.test(blocks()) && !state.cancelled);
     state.installing.onLine('Step 3 of 4: Installing RapidOCR...');
     check('the progress bar follows the installer steps', /"progress":0\.15/.test(blocks()) && /step 3 of 4/.test(blocks()) && /Installing RapidOCR/.test(blocks()) && !/Step 3 of 4:/.test(blocks()));
     {
@@ -156,13 +156,13 @@ function desk(opts) {
     c.action('view:uninstall');
     {
       const u = JSON.stringify(d.last().pane.blocks);
-      check('Uninstall lists the table OCR files with the rest, and says your own OCR package stays', /Table OCR: RapidOCR and its models in Morph's own folder/.test(u) && /OCR package you installed yourself, outside Morph, is not touched/.test(u), u.slice(0, 300));
+      check('Uninstall lists the table OCR files with the rest, and says your own OCR package stays', /Image tables: RapidOCR and its models in Morph's own folder/.test(u) && /OCR package you installed yourself, outside Morph, is not touched/.test(u), u.slice(0, 300));
     }
     c.action('view:ocr');
-    check('done: Table OCR is on, with Remove', /Table OCR is on/.test(blocks()) && /Remove table OCR/.test(blocks()));
+    check('done: Table OCR is on, with Remove', /Image tables are on/.test(blocks()) && /Remove image tables/.test(blocks()));
     c.action('ocr:off');
     await new Promise((r) => setTimeout(r, 10));
-    check('remove: back to off', /Enable table OCR/.test(blocks()) && state.ready === false);
+    check('remove: back to off', /Turn on image tables/.test(blocks()) && state.ready === false);
     c.action('ocr:on'); state.installing.onLine('Needs python3-venv. On Ubuntu:  sudo apt install python3-venv'); state.installing.onDone(false);
     check('failure: the reason is shown with Try again', /python3-venv/.test(blocks()) && /Try again/.test(blocks()));
     c.action('ocr:on'); c.action('ocr:cancel');
@@ -177,7 +177,7 @@ function desk(opts) {
     c.focus({ app: 'slack', title: 'x - Slack' }, 15);
     c.action('view:ocr');
     const b = () => JSON.stringify(d.last().pane.blocks);
-    check('an older, larger install is offered an update to the small one', /Table OCR got much smaller/.test(b()) && /Update table OCR/.test(b()));
+    check('an older, larger install is offered an update to the small one', /Image tables got much smaller/.test(b()) && /Update image tables/.test(b()));
     c.action('ocr:ask');
     check('…and the question says the old one is removed first', /about 3 GB\) is removed first/.test(b()));
   }

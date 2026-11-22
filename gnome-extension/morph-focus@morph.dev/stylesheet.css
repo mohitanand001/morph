@@ -32,7 +32,7 @@
 .fb-sbtn.fb-busy { opacity: 128; }
 .fb-sico StIcon { icon-size: 14px; }
 .fb-original .fb-row-label { color: #5c6f72; }
-.fb-soft-hint { font-size: 11px; color: #93a1a1; }
+.fb-soft-hint { font-size: 11px; color: #586e75; }
 
 /* ---------- the panel ---------- */
 /* Every border here is the same width all round: St can't round uneven borders. */
@@ -64,13 +64,18 @@
 .fb-x:hover { background-color: #e5484d; }
 
 /* the scrolling body: no visible scrollbar */
-.fb-scroll StScrollBar { width: 0; min-width: 0; }
+.fb-scroll StScrollBar { width: 5px; min-width: 5px; padding: 2px 1px; }
+.fb-scroll StScrollBar StBin#trough { background-color: transparent; }
+.fb-scroll StScrollBar StButton#vhandle { width: 3px; min-width: 3px; border-radius: 2px; background-color: #c9bf9f; }
+.fb-scroll StScrollBar StButton#vhandle:hover { background-color: #93a1a1; }
 
 /* what's on the clipboard */
 .fb-source { margin: 0 12px 4px 12px; spacing: 10px; padding: 9px 10px; background-color: #f3ecd7; border: 1px solid #e7ddc0; border-radius: 12px; }
 .fb-stile { width: 32px; height: 32px; border-radius: 9px; background-color: #fdf6e3; border: 1px solid #ddd3b4; }
 .fb-src-title { font-size: 13px; font-weight: 700; color: #0a3a45; }
-.fb-sub { font-size: 11.5px; color: #93a1a1; }
+.fb-sub { font-size: 11.5px; color: #586e75; }
+.fb-sub-2 { max-height: 31px; }
+.fb-src-meta { min-height: 47px; spacing: 1px; }
 .fb-sub.fb-ok { color: #5a6e00; font-weight: 600; }
 .fb-sub.fb-warn { color: #946e00; font-weight: 600; }
 .fb-ghost { font-size: 11.5px; font-weight: 600; color: #137b72; background-color: #fdf6e3; border: 1px solid #ddd3b4; padding: 4px 9px; border-radius: 8px; }
@@ -80,10 +85,10 @@
 .fb-size-l .fb-msg { width: 302px; }
 .fb-ghost-ib { border: 1px solid #ddd3b4; background-color: #fdf6e3; }
 .fb-ghost-ib:hover { border-color: #2aa198; background-color: rgba(42, 161, 152, 0.14); }
-.fb-note { margin: 0 16px 2px 16px; font-size: 11.5px; color: #93a1a1; }
+.fb-note { margin: 0 16px 2px 16px; font-size: 11.5px; color: #586e75; }
 
 /* the apps */
-.fb-section { padding: 6px 16px 2px 16px; font-size: 11px; font-weight: 600; color: #93a1a1; }
+.fb-section { padding: 6px 16px 2px 16px; font-size: 11px; font-weight: 600; color: #586e75; }
 .fb-list { spacing: 1px; padding: 2px 8px 6px 8px; }
 .fb-list-top { padding: 4px 8px 0 8px; }
 .fb-row { padding: 5px 8px; border-radius: 10px; border: 1px solid transparent; color: #0a3a45; }
@@ -96,7 +101,7 @@
 .fb-row.fb-busy { color: #93a1a1; }
 .fb-row.fb-done { background-color: #e8ebcf; border-color: transparent; }
 .fb-row.fb-done .fb-row-label { color: #5a6e00; font-weight: 700; }
-.fb-badge { spacing: 4px; height: 20px; padding: 0 6px; border-radius: 6px; background-color: #2aa198; }
+.fb-badge { spacing: 4px; height: 20px; padding: 0 6px; border-radius: 6px; background-color: #137b72; }
 .fb-badge-label { font-size: 11px; font-weight: 600; color: #ffffff; }
 .fb-dico { width: 24px; height: 24px; border-radius: 7px; background-color: #f1eadb; border: 1px solid rgba(70, 55, 20, 0.12); }
 .fb-dico StIcon { icon-size: 15px; }
@@ -113,7 +118,7 @@
 
 /* settings: sidebar + pane */
 .fb-settings { border-top: 1px solid #e7ddc0; }
-.fb-side { width: 116px; padding: 10px 8px; spacing: 2px; border-right: 1px solid #e7ddc0; }
+.fb-side { width: 132px; padding: 10px 8px; spacing: 2px; border-right: 1px solid #e7ddc0; }
 .fb-nav { padding: 6px 8px; border-radius: 8px; }
 .fb-nav:hover { background-color: #f3ecd7; }
 .fb-nav-on { background-color: rgba(42, 161, 152, 0.14); }
@@ -123,15 +128,15 @@
 .fb-nav-on .fb-nav-label { font-weight: 700; color: #0a3a45; }
 .fb-content { padding: 12px 14px; }
 .fb-h2 { font-size: 15px; font-weight: 700; color: #0a3a45; }
-.fb-lede { font-size: 11.5px; color: #93a1a1; margin: 1px 0 6px 0; }
-.fb-subhead { font-size: 11px; font-weight: 600; color: #93a1a1; margin: 10px 0 4px 0; }
+.fb-lede { font-size: 11.5px; color: #586e75; margin: 1px 0 6px 0; }
+.fb-subhead { font-size: 11px; font-weight: 600; color: #586e75; margin: 10px 0 4px 0; }
 .fb-opt { padding: 8px 0; }
 .fb-opt.fb-sep { border-top: 1px solid #e7ddc0; }
 .fb-opt-box { spacing: 10px; }
 .fb-oi { width: 28px; height: 28px; border-radius: 8px; background-color: #f3ecd7; }
 .fb-oi StIcon { icon-size: 16px; }
 .fb-ot-b { font-size: 12.5px; font-weight: 600; color: #0a3a45; }
-.fb-ot-s { font-size: 11.5px; color: #93a1a1; }
+.fb-ot-s { font-size: 11.5px; color: #586e75; }
 .fb-ot-warn { font-size: 11px; font-weight: 600; color: #946e00; }
 .fb-keys { spacing: 3px; margin-top: 3px; }
 .fb-kbd { font-size: 10.5px; font-weight: 600; color: #5c6f72; background-color: #fbf6e8; border: 1px solid #d9cfb0; border-radius: 5px; padding: 1px 6px; }
@@ -164,12 +169,12 @@
 .fb-look-sol-light { background-color: #fdf6e3; }
 .fb-look-sol-dark { background-color: #04313d; }
 .fb-cl { font-size: 12.5px; font-weight: 700; color: #0a3a45; }
-.fb-cs { font-size: 11px; color: #93a1a1; }
+.fb-cs { font-size: 11px; color: #586e75; }
 .fb-hero { spacing: 10px; margin: 4px 0 10px 0; }
 .fb-hero-name { font-size: 15px; font-weight: 700; color: #0a3a45; }
-.fb-hero-ver { font-size: 11.5px; color: #93a1a1; }
+.fb-hero-ver { font-size: 11.5px; color: #586e75; }
 .fb-about-text { font-size: 12px; color: #5c6f72; margin-bottom: 8px; width: 290px; }
-.fb-about-legal { font-size: 10.5px; color: #93a1a1; width: 290px; }
+.fb-about-legal { font-size: 10.5px; color: #586e75; width: 290px; }
 .fb-size-s .fb-about-text, .fb-size-s .fb-about-legal { width: 255px; }
 .fb-size-l .fb-about-text, .fb-size-l .fb-about-legal { width: 345px; }
 
@@ -202,3 +207,7 @@
 .fb-btn-danger { color: #ffffff; background-color: #b5544b; border-color: #b5544b; }
 .fb-btn-danger:hover { background-color: #9c453d; }
 .fb-btn-off, .fb-btn-off:hover { color: #93a1a1; background-color: #f3ecd7; border-color: #e7ddc0; }
+
+/* Keyboard focus (Settings takes the keyboard while open): a ring that does not change any size. */
+.fb-panel StButton:focus { box-shadow: inset 0 0 0 2px #137b72; }
+.fb-panel .fb-ib:focus, .fb-panel .fb-nav:focus { box-shadow: inset 0 0 0 2px #137b72; background-color: #f3ecd7; }

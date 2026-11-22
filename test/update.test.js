@@ -87,7 +87,7 @@ const general = (d, c) => { c.action('view:settings'); return d.last().pane.opts
     c.focus({ app: 'firefox', title: 'x' }, 12);
     c.action('view:settings');
     check('v12: Updates and Uninstall have their own sections', d.last().nav.map((n) => n.label).join() === 'General,Apps,Shortcuts,Privacy,Size,Updates,Uninstall,About');
-    check('v12: General no longer carries them', !(d.last().pane.actions || []).length && !d.last().pane.opts.some((o) => /pdate|ninstall/.test(o.label)));
+    check('v12: General no longer carries them', !(d.last().pane.actions || []).some((o) => /pdate|ninstall/.test(o.label)) && !d.last().pane.opts.some((o) => /pdate|ninstall/.test(o.label)));
     c.action('view:updates');
     const acts = () => d.last().pane.actions;
     check('Updates says you are on the latest, with a refresh button', /latest/.test(acts()[0].label) && acts()[0].trail === 'refresh' && acts()[0].action === 'checkupdate:');

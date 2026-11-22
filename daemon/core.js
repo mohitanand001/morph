@@ -21,7 +21,10 @@ const { extractLinks } = require('../lib/links');
 const { SHORTCUTS, normalizeShortcuts, accelLabel } = require('../lib/keys');
 
 const ALL_DESTS = ['slack', 'jira', 'confluence', 'email', 'gdocs', 'markdown', 'text', 'notion', 'linear', 'teams'];
-const OPTION_LABEL = { slack: 'Slack', jira: 'Jira', confluence: 'Confluence', email: 'Email', gdocs: 'Docs', markdown: 'Markdown', text: 'Text', notion: 'Notion', linear: 'Linear', teams: 'Teams' };
+// Rows use the same app names as Settings → Apps; the ones that stand for a format say so on hover.
+const OCR_SIZE = 'about 400 MB'; // one number everywhere: the RapidOCR download, models included
+const OPTION_LABEL = { slack: 'Slack', jira: 'Jira', confluence: 'Confluence', email: 'Outlook', gdocs: 'Google Docs', markdown: 'GitHub', text: 'Terminal', notion: 'Notion', linear: 'Linear', teams: 'Teams' };
+const OPTION_TIP = { email: 'Email: Outlook, Gmail', markdown: 'Markdown: GitHub, Claude, ChatGPT', text: 'Plain text: Terminal and anything else' };
 const DEST_COLOR = { slack: '#e01e5a', jira: '#2684ff', confluence: '#1d9bd1', email: '#ea4335', gdocs: '#4285f4', markdown: '#9aa3ad', text: '#3fb950', notion: '#e8e6e1', linear: '#7c85f0', teams: '#7b83eb' };
 const DEST_NAME = { slack: 'Slack', jira: 'Jira', confluence: 'Confluence', email: 'Email', gdocs: 'Google Docs', markdown: 'Markdown', text: 'Plain text', notion: 'Notion', linear: 'Linear', teams: 'Teams' };
 const SIZE_NAMES = { s: 'Small', m: 'Medium', l: 'Large' };
@@ -107,6 +110,7 @@ function createCore(io) {
   let checkNote = '';           // what the last manual check found
   let confirmTimer = null;
   let readLog = [];           // what Morph read or skipped: time, kind, app, size. Never titles or content. Memory only.
+  let lastCopy = null;        // { from, what, image } of the latest copy Morph read
   let lastSkip = null;        // { app } of the latest copy Morph did not read
 
   // ---------------------------------------------------------------- settings
@@ -206,22 +210,22 @@ function createCore(io) {
       { kind: 'buttons', buttons: [{ label: yes, action: yesAction, kind: 'primary' }, { label: no, action: 'ocr:no', kind: 'secondary' }] }];
     if (ocrJob) {
       if (ocrAsk === 'stop') return ask('Stop installing?', 'What was downloaded so far is removed. You can start again later.', 'Stop', 'ocr:cancel', 'Keep installing');
-      return [{ kind: 'status', tone: 'plain', icon: 'download', title: 'Installing table OCR' + (ocrJob.step ? ' · step ' + ocrJob.step : '…'), progress: ocrJob.progress || 0.02, items: [ocrJob.line || 'Starting…', 'About 1 GB, a few minutes. You can keep using your computer.'] },
+      return [{ kind: 'status', tone: 'plain', icon: 'download', title: 'Installing image tables' + (ocrJob.step ? ' · step ' + ocrJob.step : '…'), progress: ocrJob.progress || 0.02, items: [ocrJob.line || 'Starting…', 'Downloading ' + OCR_SIZE + ', a few minutes. You can keep using your computer.'] },
         { kind: 'buttons', buttons: [{ label: 'Stop installing', action: 'ocr:askstop', kind: 'secondary' }] }];
     }
     if (ocrReady()) {
-      if (ocrAsk === 'off' && ocrCanManage()) return ask('Remove table OCR?', 'This deletes the OCR files (about 400 MB). Morph keeps working without it.', 'Remove', 'ocr:off', 'Keep it');
-      return [{ kind: 'panel', tone: 'ok', icon: 'check_circle', title: 'Table OCR is on', text: 'A copied image is read only when you pick an app, on this device. Nothing is uploaded.' },
-        ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Remove table OCR', action: 'ocr:askoff', kind: 'secondary' }] }] : [])];
+      if (ocrAsk === 'off' && ocrCanManage()) return ask('Remove image tables?', 'This deletes its files (' + OCR_SIZE + '). Morph keeps working without it.', 'Remove', 'ocr:off', 'Keep it');
+      return [{ kind: 'panel', tone: 'ok', icon: 'check_circle', title: 'Image tables are on', text: 'A copied image is read only when you pick an app, on this device. Nothing is uploaded.' },
+        ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Remove image tables', action: 'ocr:askoff', kind: 'secondary' }] }] : [])];
     }
-    if (ocrAsk === 'on' && ocrCanManage()) return ask('Download about 400 MB?', 'This installs RapidOCR once and needs internet. Images are read only on this computer, and only when you pick an app.' + (ocrLegacy() ? ' The older, larger table OCR (about 3 GB) is removed first.' : ''), 'Install', 'ocr:on', 'Not now');
+    if (ocrAsk === 'on' && ocrCanManage()) return ask('Download ' + OCR_SIZE + '?', 'This installs RapidOCR once and needs internet. Images are read only on this computer, and only when you pick an app.' + (ocrLegacy() ? ' The older, larger version (about 3 GB) is removed first.' : ''), 'Install', 'ocr:on', 'Not now');
     if (ocrLegacy()) {
-      return [{ kind: 'panel', tone: 'warn', icon: 'download', title: 'Table OCR got much smaller', text: 'The new version is about 400 MB instead of 3 GB, and reads a screenshot in a few seconds. Update to keep reading tables from images.' },
-        ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Update table OCR', action: 'ocr:ask', kind: 'primary' }] }] : [])];
+      return [{ kind: 'panel', tone: 'warn', icon: 'download', title: 'Image tables got much smaller', text: 'The new version is ' + OCR_SIZE + ' instead of 3 GB, and reads a screenshot in a few seconds. Update to keep reading tables from images.' },
+        ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Update image tables', action: 'ocr:ask', kind: 'primary' }] }] : [])];
     }
-    return [{ kind: 'panel', tone: ocrFail ? 'warn' : 'plain', icon: ocrFail ? 'warning' : 'table', title: 'Table OCR (optional)',
+    return [{ kind: 'panel', tone: ocrFail ? 'warn' : 'plain', icon: ocrFail ? 'warning' : 'table', title: 'Image tables (optional)',
         text: ocrFail ? ocrFail : 'Reads tables from copied screenshots, on this device. Off until you turn it on.' },
-      ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: ocrFail ? 'Try again' : 'Enable table OCR', action: 'ocr:ask', kind: 'primary' }] }] : [])];
+      ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: ocrFail ? 'Try again' : 'Turn on image tables', action: 'ocr:ask', kind: 'primary' }] }] : [])];
   }
   function ocrAction(arg) {
     if (arg === 'ask' || arg === 'askstop' || arg === 'askoff') { ocrAsk = arg === 'ask' ? 'on' : arg.slice(3); sendPill(); return; }
@@ -268,11 +272,10 @@ function createCore(io) {
     if (shellStatus === 'unavailable') return true;
     return !!currentRule;
   };
+  // What the latest read copy was, kept as fields (a format name can hold commas, so clipStatus is never parsed).
   function copySummary() {
-    if (clipStatus === 'Nothing copied yet' || /^Nothing to convert/.test(clipStatus) || /^Not read/.test(clipStatus) || /^(Image copied|Reading the table)/.test(clipStatus)) return null;
-    const t = clipStatus.replace(/^Last copy: /, '');
-    const i = t.indexOf(', ');
-    return i < 0 ? { from: t, what: '' } : { from: t.slice(0, i), what: t.slice(i + 2) };
+    if (!lastCopy || !/^(Last copy|Table read from an image)/.test(clipStatus)) return null;
+    return lastCopy;
   }
   function copyPlace() {
     if (!copyWin || !copyWin.win) return null;
@@ -292,7 +295,7 @@ function createCore(io) {
       { id: 'edit', label: 'Apps', icon: 'grid_view' },
       { id: 'keys', label: 'Shortcuts', icon: 'keyboard' },
       { id: 'privacy', label: 'Privacy', icon: 'lock' },
-      ...(shellVersion >= 15 ? [{ id: 'ocr', label: 'Images', icon: 'image' }] : []),
+      ...(shellVersion >= 15 ? [{ id: 'ocr', label: 'Image tables', icon: 'image' }] : []),
       { id: 'size', label: 'Size', icon: 'aspect_ratio' },
       ...(shellVersion >= 12 ? [{ id: 'updates', label: 'Updates', icon: 'refresh' }, { id: 'uninstall', label: 'Uninstall', icon: 'delete' }] : []),
       { id: 'about', label: 'About', icon: 'info' },
@@ -366,7 +369,7 @@ function createCore(io) {
             'Start at login',
             'The tab on the screen edge (its GNOME helper)',
             'The morph command',
-            ...(ocrReady() || ocrLegacy() || ocrJob ? ['Table OCR: RapidOCR and its models in Morph\'s own folder'] : []) ] },
+            ...(ocrReady() || ocrLegacy() || ocrJob ? ['Image tables: RapidOCR and its models in Morph\'s own folder'] : []) ] },
           { kind: 'panel', tone: 'warn', icon: 'warning', title: 'This deletes your Morph settings', text: 'Nothing you copy is ever stored by Morph, so there is no clipboard data to lose. Your documents and other files are not touched.' + (ocrReady() || ocrLegacy() || ocrJob ? ' An OCR package you installed yourself, outside Morph, is not touched either.' : '') },
           { kind: 'buttons', buttons: io.uninstall ? [
             { label: 'Keep Morph', action: 'view:settings', kind: 'secondary' },
@@ -392,6 +395,9 @@ function createCore(io) {
           { icon: 'bolt', label: 'Convert automatically', sub: 'Converts a copy when you switch apps', sw: sw(settings.autoFormat), action: 'toggle:auto' },
           { icon: 'grid_view', label: 'Quick buttons on the tab', sub: 'One-click app buttons on the closed tab', sw: sw(settings.tabIcons), action: 'toggle:tabicons' },
         ] };
+      // ✕ on the panel only closes it into the tab; hiding Morph altogether is here.
+      const pk = settings.shortcuts.find((k) => k.id === 'pill');
+      spec.pane.actions = [{ icon: 'power_settings_new', label: 'Hide ' + APP_NAME, sub: 'Until you press ' + (pk && pk.on ? accelLabel(pk.accel, false) : 'morph --restart') + ' or log in again', action: 'hide:' }];
       if (shellVersion < 12) {
         // An older helper only draws switches: keep the old two-click rows until it is updated.
         spec.pane.opts.push({ icon: 'download', label: 'Check for updates daily', sub: 'Looks at the Morph website once a day', sw: sw(settings.updateCheck), action: 'toggle:updates' });
@@ -419,10 +425,11 @@ function createCore(io) {
     const ocrImage = !copy && (ocrBusy || /^Image copied/.test(clipStatus) || /holds an image$/.test(clipStatus)) && ocrReady(); // decided now, not when it was copied
     const idle = !copy && !skipped && !ocrImage; // a skipped copy still lets you pick an app: that click is you asking Morph to read it
     const imageOnly = idle && (/image$/.test(clipStatus) || /^Image copied/.test(clipStatus));
-    for (let i = 0; i < others.length; i += 2) rows.push(others.slice(i, i + 2).map((d) => (tickDest === d
+    const optRow = (d) => (tickDest === d
       ? { label: OPTION_LABEL[d], done: true }
-      : idle ? { label: OPTION_LABEL[d], dest: d, off: true }
-      : { label: OPTION_LABEL[d], dest: d, action: 'fix:' + d, color: DEST_COLOR[d], busy: OPTION_LABEL[d] + '…' })));
+      : idle ? { label: OPTION_LABEL[d], dest: d, off: true, tip: OPTION_TIP[d] }
+      : { label: OPTION_LABEL[d], dest: d, action: 'fix:' + d, color: DEST_COLOR[d], busy: OPTION_LABEL[d] + '…', tip: OPTION_TIP[d] });
+    for (let i = 0; i < others.length; i += 2) rows.push(others.slice(i, i + 2).map(optRow));
     const spec = {
       visible: pillShouldShow(),
       theme: settings.theme,
@@ -447,7 +454,7 @@ function createCore(io) {
       recent: [],
       view: 'main',
       gear: 'view:settings',
-      source: copy ? { icon: /table/i.test(copy.what || '') ? 'table' : 'content_paste', dest: place ? place.dest : '', title: 'Copied from ' + (place ? place.tool : copy.from), sub: [place ? place.where : '', copy.what].filter(Boolean).join(' · ') }
+      source: copy ? { icon: /table/i.test(copy.what || '') ? 'table' : 'content_paste', dest: place ? place.dest : '', title: place ? 'Copied from ' + place.tool : copy.image ? 'Table read from an image' : copy.from ? 'Copied from ' + copy.from : 'Copied', sub: [place ? place.where : '', copy.what].filter(Boolean).join(' · ') }
         : skipped ? { icon: 'lock', title: 'Copied from ' + lastSkip.app, sub: lastSkip.pm ? 'Never read: a password manager' : 'Not read: ' + lastSkip.app + ' is off in Settings → Apps' }
         : ocrBusy ? { icon: 'image', title: 'Reading the table…', sub: 'A few seconds' }
         : ocrImage ? { icon: 'image', title: 'Image copied', sub: ocrNote || 'Pick an app to read its table' }
@@ -466,6 +473,8 @@ function createCore(io) {
     };
     if (pillView !== 'main') return settingsSpec(spec, pillView);
     if (copy && rule && settings.autoFormat && autoDoneDest === rule.dest) spec.sub = (copy.what ? copy.what + ' · ' : '') + 'already fixed, just press Ctrl V';
+    // The app you are in gets its own row on top, so it is never missing from the list.
+    if (rule && offered.includes(rule.dest)) spec.primary = Object.assign(optRow(rule.dest), { label: rule.name, hint: 'This app' }, tickDest === rule.dest ? {} : { busy: rule.name + '…' });
     spec.section = rule ? 'Copy for another app' : 'Copy it for';
     spec.options = rows;
     if (copy) {
@@ -485,8 +494,8 @@ function createCore(io) {
     if (flash && flash.pdf && lastPdf) spec.links = [{ label: 'Open the PDF', action: 'openpdf:' }, { label: 'Show in folder', action: 'showpdf:' }];
     else if (copy && crossLinks.length) spec.links = crossLinks.map((l, i) => ({ label: (l.kind === 'jira' ? '🎫 ' : l.kind === 'email' ? '✉ ' : '🔗 ') + l.label, action: 'openlink:' + i }));
     if (flash) {
-      if (flash.done && spec.primary) spec.primary = { label: flash.done, done: true };
-      else { spec.sub = flash.sub; spec.subTone = flash.tone; }
+      if (flash.done && spec.primary) spec.primary = { label: flash.done.replace(/^✓ /, ''), done: true };
+      if (!(flash.done && spec.primary) || flash.sub) { spec.sub = flash.sub; spec.subTone = flash.tone; }
       if (flash.collapse) spec.collapseAfterMs = flash.done ? 1200 : 1800;
     }
     return spec;
@@ -543,6 +552,8 @@ function createCore(io) {
     original = clip;
     crossLinks = settings.crossLinks ? extractLinks(sh.text, sh.html, settings.atlassianSite) : [];
     clipStatus = r.has ? 'Last copy: ' + (FB.SOURCES[r.source] || 'text') + ', ' + (FB.astStats(r.ast).summary || 'text') : 'Nothing to convert';
+    const fromWin = copyWin && (copyWin.text === null || copyWin.text === sh.text) && copyWin.win ? appLabel(copyWin.win) : '';
+    lastCopy = r.has ? { from: fromWin === 'another app' ? '' : fromWin, what: FB.astStats(r.ast).summary || 'Text' } : null;
     sendPill();
     return clip;
   }
@@ -582,6 +593,7 @@ function createCore(io) {
     ocrFromImage = true;
     crossLinks = [];
     clipStatus = 'Table read from an image, ' + (FB.astStats(run.ast).summary || 'table');
+    lastCopy = { from: '', what: FB.astStats(run.ast).summary || 'Table', image: true };
     ocrSeq = copySeq; ocrSeqClip = clip;
     sendPill();
     return clip;
@@ -871,6 +883,7 @@ function createCore(io) {
   function hidePill() {
     const keys = settings.shortcuts.find((k) => k.id === 'pill');
     const how = keys && keys.on ? accelLabel(keys.accel, false) : 'morph --restart';
+    pillView = 'main'; // the message shows on the main card
     flash = { sub: 'Hiding. Bring it back with ' + how + '.', tone: 'ok', open: true };
     sendPill();
     io.setTimeout(() => { settings.pillEnabled = false; save(); sendPill(); }, 2200);

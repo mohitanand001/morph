@@ -118,9 +118,9 @@ function desk(saved) {
     check('Privacy: read log shows the skip, without content', /Skipped a copy from/.test(items) && !/hello/.test(items));
     check('Privacy: lists what is never read', /Never read/.test(items) && /Password managers/.test(items));
     check('Privacy: no switch of its own; it points to Apps', !pane.opts && pane.actions[0].action === 'view:edit');
-    check('table OCR has its own page, not Privacy', !/table OCR/i.test(items) && d.last().nav.some((n) => n.action === 'view:ocr'));
+    check('table OCR has its own page, not Privacy', !/image tables|OCR/i.test(items) && d.last().nav.some((n) => n.action === 'view:ocr'));
     c.action('view:ocr');
-    check('Image tables page shows the OCR controls', d.last().pane.title === 'Image tables' && /Enable table OCR|Table OCR/.test(JSON.stringify(d.last().pane.blocks)));
+    check('Image tables page shows the OCR controls', d.last().pane.title === 'Image tables' && /Turn on image tables|Image tables/.test(JSON.stringify(d.last().pane.blocks)));
   }
   {
     const d = desk(JSON.stringify({ setupDone: true, readFrom: 'listed' })); const c = createCore(d.io);

@@ -43,7 +43,7 @@ import { Slider } from 'resource:///org/gnome/shell/ui/slider.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const PILL_VERSION = 28;
+const PILL_VERSION = 29;
 const IFACE = `
 <node>
   <interface name="dev.morph.Focus">
@@ -142,6 +142,7 @@ export default class FormatBridgeHelper extends Extension {
   }
 
   disable() {
+    try { this._dropKeys(); } catch (e) { /* gone */ }
     if (this._revealId) { GLib.source_remove(this._revealId); this._revealId = 0; }
     if (this._idleId) { GLib.source_remove(this._idleId); this._idleId = 0; } // a timer must not outlive the pill
     this._closeSetup();
@@ -530,7 +531,7 @@ export default class FormatBridgeHelper extends Extension {
       const it = this._editItems[r.ci];
       const fl = new St.BoxLayout({ style_class: this._editList ? 'fb-app-row fb-floating' : 'fb-option fb-echip fb-floating', reactive: false });
       const flRow = new St.BoxLayout({ style_class: this._editList ? 'fb-app-box' : 'fb-btn-row', x_expand: true });
-      if (this._editList) flRow.add_child(this._gl('drag_indicator', '#93a1a1', 18));
+      if (this._editList) flRow.add_child(this._gl('drag_indicator', '#657b83', 18));
       flRow.add_child(this._chipDot(it));
       flRow.add_child(new St.Label({ style_class: this._editList ? 'fb-app-name' : 'fb-btn-label', text: str(it.label, 24), x_expand: true, y_align: Clutter.ActorAlign.CENTER }));
       fl.add_child(flRow);
@@ -577,7 +578,7 @@ export default class FormatBridgeHelper extends Extension {
       const it = this._editItems[r.ci];
       const fl = new St.BoxLayout({ style_class: 'fb-app-row fb-floating', reactive: false });
       const flRow = new St.BoxLayout({ style_class: 'fb-app-box', x_expand: true });
-      flRow.add_child(this._gl('drag_indicator', '#93a1a1', 18));
+      flRow.add_child(this._gl('drag_indicator', '#657b83', 18));
       flRow.add_child(this._chipDot(it));
       flRow.add_child(new St.Label({ style_class: 'fb-app-name', text: str(it.label, 24), x_expand: true, y_align: Clutter.ActorAlign.CENTER }));
       fl.add_child(flRow);
@@ -856,7 +857,8 @@ export default class FormatBridgeHelper extends Extension {
   }
   // ---- Hover labels for the tab's icons. They open away from the screen edge (to the left of a tab on the
   // right), after a short pause, fade in, and go on their own after a few seconds. Never during a drag.
-  _tipWire(actor, text) {
+  _tipWire(actor, text, below) {
+    actor._fbTipBelow = !!below;
     actor.connect('notify::hover', () => { if (actor.hover) this._tipArm(actor, text); else this._tipHide(); });
     actor.connect('button-press-event', () => { this._tipHide(); return Clutter.EVENT_PROPAGATE; });
   }
@@ -878,6 +880,15 @@ export default class FormatBridgeHelper extends Extension {
       const [, th] = this._tip.get_preferred_height(tw);
       const [ax, ay] = actor.get_transformed_position();
       const [aw, ah] = actor.get_transformed_size();
+      if (actor._fbTipBelow) { // buttons inside the panel: under the button, centred on it
+        const bx = Math.max(m.x + 4, Math.min(Math.round(ax + aw / 2 - tw / 2), m.x + m.width - tw - 4));
+        let by = ay + ah + 6;
+        if (by + th > m.y + m.height - 4) by = ay - th - 6;
+        this._tip.set_position(bx, Math.round(by));
+        this._tip.ease({ opacity: 255, duration: 120, mode: Clutter.AnimationMode.EASE_OUT_QUAD });
+        this._tipLife = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2600, () => { this._tipLife = 0; this._tipHide(); return GLib.SOURCE_REMOVE; });
+        return;
+      }
       const GAP = 12; // clear of the tab itself
       let x = this._side === 'r' ? ax - tw - GAP : ax + aw + GAP;
       if (x < m.x + 4) x = ax + aw + GAP;                  // no room on that side: use the other
@@ -949,8 +960,9 @@ export default class FormatBridgeHelper extends Extension {
   }
   _ib(cls, name, title, onClick) {
     const b = new St.Button({ style_class: 'fb-ib ' + cls, can_focus: false, reactive: true, track_hover: true, y_align: Clutter.ActorAlign.CENTER, accessible_name: title });
-    b.set_child(this._gl(name, '#93a1a1', 18));
+    b.set_child(this._gl(name, '#657b83', 18));
     b.connect('clicked', onClick);
+    if (title) this._tipWire(b, str(title, 60), true);
     return b;
   }
   _lbl(cls, text, max, wrap) {
@@ -991,6 +1003,7 @@ export default class FormatBridgeHelper extends Extension {
     }
     b.set_child(box);
     if (o.off) { b.reactive = false; b.opacity = 105; return b; } // nothing copied yet: shown, but inert
+    if (o.tip) this._tipWire(b, str(o.tip, 60), true);
     const action = str(o.action);
     if (action && ACTION_RE.test(action)) {
       b.connect('clicked', () => {
@@ -1179,7 +1192,7 @@ export default class FormatBridgeHelper extends Extension {
         b.set_child(l);
         const paint = () => {
           const foc = b.has_key_focus();
-          if (main) b.set_style('background-color: ' + (b.hover ? '#25918a' : ACC) + '; border: 1px solid ' + ACC + '; border-radius: 9px; padding: 8px 14px;' + (foc ? ' ' + ring : ''));
+          if (main) b.set_style('background-color: ' + (b.hover ? '#0f6a62' : '#137b72') + '; border: 1px solid #137b72; border-radius: 9px; padding: 8px 14px;' + (foc ? ' ' + ring : ''));
           else b.set_style('border-radius: 9px; padding: 8px 14px; border: 1px solid ' + (foc ? INK : LINE) + '; background-color: ' + (b.hover ? '#f4ecd4' : CREAM) + ';' + (foc ? ' ' + ring : ''));
           l.set_style('color: ' + (main ? CREAM : INK) + '; font-weight: 600; font-size: 11pt;');
         };
@@ -1275,7 +1288,88 @@ export default class FormatBridgeHelper extends Extension {
   // Rebuild the panel from the spec: a title bar (logo · Morph · gear ·
   // – ✕), a card saying what's on the clipboard, then one row per app.
   // Settings swaps the body for a sidebar and a pane, like the design.
+  // ---- Keyboard: while Settings is open the panel takes the keyboard (Tab, arrows, Enter, Esc to go back).
+  // A click anywhere else hands it back. The main view never takes it, so typing in your app is untouched.
   _fillPanel() {
+    const at = this._focusIndex();
+    this._fillPanelInner();
+    this._syncKeys(at);
+  }
+  _focusables() {
+    const out = [];
+    const walk = (a) => {
+      if (!a || !a.visible) return;
+      if (a instanceof St.Button && a.reactive) out.push(a);
+      a.get_children().forEach(walk);
+    };
+    try { walk(this._panel); } catch (e) { /* gone */ }
+    return out;
+  }
+  _focusIndex() {
+    try {
+      const f = global.stage.get_key_focus();
+      return this._grab && f ? this._focusables().indexOf(f) : -1;
+    } catch (e) { return -1; }
+  }
+  _syncKeys(at) {
+    const want = !!(this._open && this._spec && this._spec.view === 'settings' && !this._keysReleased);
+    if (!this._panelPressId) {
+      // a click inside the panel takes the keyboard back after a click elsewhere let it go
+      this._panelPressId = this._panel.connect('captured-event', (_a, e) => {
+        const t = e.type();
+        if (t !== Clutter.EventType.BUTTON_PRESS && t !== Clutter.EventType.TOUCH_BEGIN) return Clutter.EVENT_PROPAGATE;
+        const [x, y] = e.get_coords();
+        if (this._grab && !this._inside(x, y)) { this._keysReleased = true; this._dropKeys(); }
+        else if (!this._grab && this._inside(x, y) && this._keysReleased) { this._keysReleased = false; this._syncKeys(-1); }
+        return Clutter.EVENT_PROPAGATE;
+      });
+    }
+    if (!want) { this._dropKeys(); return; }
+    this._focusables().forEach((b) => { b.can_focus = true; });
+    try {
+      if (!this._grab) {
+        this._grab = Main.pushModal(this._panel, { actionMode: Shell.ActionMode.POPUP });
+        if (this._grab && this._grab.get_seat_state && !(this._grab.get_seat_state() & Clutter.GrabState.KEYBOARD)) { Main.popModal(this._grab); this._grab = null; return; }
+        this._keyId = this._panel.connect('key-press-event', (_a, e) => this._onKey(e));
+      }
+      const list = this._focusables();
+      if (at >= 0 && list.length) list[Math.min(at, list.length - 1)].grab_key_focus();
+    } catch (e) { this._grab = null; log('morph keys: ' + e); }
+  }
+  _dropKeys() {
+    if (this._keyId) { try { this._panel.disconnect(this._keyId); } catch (e) { /* gone */ } this._keyId = 0; }
+    if (this._grab) { try { Main.popModal(this._grab); } catch (e) { /* gone */ } this._grab = null; }
+  }
+  _onKey(e) {
+    const k = e.get_key_symbol();
+    if (k === Clutter.KEY_Escape) { this._send((this._spec && this._spec.back) || 'view:main'); return Clutter.EVENT_STOP; }
+    const fwd = k === Clutter.KEY_Tab || k === Clutter.KEY_Down;
+    const back = k === Clutter.KEY_ISO_Left_Tab || k === Clutter.KEY_Up;
+    if (!fwd && !back) return Clutter.EVENT_PROPAGATE;
+    try {
+      const cur = global.stage.get_key_focus();
+      const from = cur && cur !== this._panel && this._panel.contains(cur) ? cur : null;
+      this._panel.navigate_focus(from, fwd ? St.DirectionType.TAB_FORWARD : St.DirectionType.TAB_BACKWARD, true);
+      this._showFocus();
+    } catch (err) { /* keep going */ }
+    return Clutter.EVENT_STOP;
+  }
+  // Keep the focused control in view inside the scrolling pane.
+  _showFocus() {
+    try {
+      const f = global.stage.get_key_focus();
+      const sc = this._scroll;
+      if (!f || !sc || !sc.contains(f)) return;
+      const a = sc.vadjustment || sc.get_vscroll_bar().get_adjustment();
+      const [, fy] = f.get_transformed_position();
+      const [, fh] = f.get_transformed_size();
+      const [, sy] = sc.get_transformed_position();
+      const [, sh] = sc.get_transformed_size();
+      if (fy < sy) a.value = Math.max(0, a.value - (sy - fy) - 8);
+      else if (fy + fh > sy + sh) a.value = a.value + (fy + fh - sy - sh) + 8;
+    } catch (e) { /* gone */ }
+  }
+  _fillPanelInner() {
     const s = this._spec;
     // Remember how far the settings pane was scrolled, so a switch or an added app doesn't send you back to the top.
     let keep = null;
@@ -1311,19 +1405,17 @@ export default class FormatBridgeHelper extends Extension {
     bar.add_child(new St.Widget({ x_expand: true }));
     if (!settingsView && s.gear) bar.add_child(this._ib('fb-gear', 'settings', 'Settings', () => this._send(s.gear)));
     const wc = new St.BoxLayout({ style_class: 'fb-wc', y_align: Clutter.ActorAlign.CENTER });
-    const tuck = this._ib('fb-tuck', 'remove', 'Tuck away', () => this._setOpen(false));
-    const x = this._ib('fb-x', 'close', 'Hide Morph', () => this._action('hide:')); // Morph says how to bring it back, then hides
-    wc.add_child(tuck);
+    const x = this._ib('fb-x', 'close', 'Close', () => this._setOpen(false)); // folds into the tab; hiding Morph is in Settings → General
     wc.add_child(x);
     bar.add_child(wc);
-    this._ctrlBtns = [tuck, x];
+    this._ctrlBtns = [x];
     this._ctrlBox = wc;
     this._panel.add_child(bar);
 
     this._body = vbox({ style_class: 'fb-body', x_expand: true });
     if (settingsView) { this._fillSettings(s); return; }
     const scroll = new St.ScrollView({ style_class: 'fb-scroll', x_expand: true, y_expand: true, overlay_scrollbars: true });
-    try { scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.EXTERNAL); } catch (e) { try { scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC); } catch (e2) { /* default */ } }
+    try { scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC); } catch (e) { /* default */ }
     try { scroll.set_child(this._body); } catch (e) { scroll.add_child(this._body); }
     const mon = this._monitor();
     const room = Math.max(220, Math.floor((mon ? mon.height : 800) * 0.8 - 60));
@@ -1383,10 +1475,16 @@ export default class FormatBridgeHelper extends Extension {
       t.set_child(ic);
       card.add_child(t);
     } else card.add_child(this._tile('fb-stile', ['table', 'content_paste', 'notes', 'description', 'image'].includes(src.icon) ? src.icon : 'content_paste', '#137b72', 22));
-    const meta = vbox({ x_expand: true, y_align: Clutter.ActorAlign.CENTER });
+    const meta = vbox({ style_class: 'fb-src-meta', x_expand: true, y_align: Clutter.ActorAlign.CENTER });
     meta.add_child(this._lbl('fb-src-title', src.title, 60));
     const msg = s.sub ? str(s.sub, 160) : '';
-    if (msg || src.sub) meta.add_child(this._lbl('fb-sub' + (msg && s.subTone === 'ok' ? ' fb-ok' : msg && s.subTone === 'warn' ? ' fb-warn' : ''), msg || src.sub, 160));
+    if (msg || src.sub) {
+      // Up to two lines, so a message that says what to do is never cut short.
+      const sub = this._lbl('fb-sub fb-sub-2' + (msg && s.subTone === 'ok' ? ' fb-ok' : msg && s.subTone === 'warn' ? ' fb-warn' : ''), msg || src.sub, 160, true);
+      sub.clutter_text.ellipsize = ELLIPSIZE_END;
+      sub.y_align = Clutter.ActorAlign.START;
+      meta.add_child(sub);
+    }
     card.add_child(meta);
     if (s.secondary && s.secondary.label && ACTION_RE.test(str(s.secondary.action))) {
       const act = str(s.secondary.action);
@@ -1448,7 +1546,7 @@ export default class FormatBridgeHelper extends Extension {
       if (!n || typeof n !== 'object') return;
       const b = new St.Button({ style_class: 'fb-nav' + (n.on ? ' fb-nav-on' : ''), can_focus: false, reactive: true, track_hover: true, x_expand: true });
       const box = new St.BoxLayout({ style_class: 'fb-nav-box', x_expand: true });
-      box.add_child(this._gl(str(n.icon, 20), n.on ? '#137b72' : '#93a1a1', 20));
+      box.add_child(this._gl(str(n.icon, 20), n.on ? '#137b72' : '#657b83', 20));
       box.add_child(this._lbl('fb-nav-label', n.label, 20));
       b.set_child(box);
       b.connect('clicked', () => this._send(n.action));
@@ -1526,7 +1624,7 @@ export default class FormatBridgeHelper extends Extension {
       pane.add_child(this._lbl('fb-about-legal', p.about.legal, 400, true));
     }
     const scroll = new St.ScrollView({ style_class: 'fb-scroll', x_expand: true, y_expand: true, overlay_scrollbars: true });
-    try { scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.EXTERNAL); } catch (e) { try { scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC); } catch (e2) { /* default */ } }
+    try { scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC); } catch (e) { /* default */ }
     try { scroll.set_child(pane); } catch (e) { scroll.add_child(pane); }
     scroll.set_style(pin(inner));
     scroll.clip_to_allocation = true;
@@ -1968,6 +2066,8 @@ export default class FormatBridgeHelper extends Extension {
     this._tipHide();
     this._handle.visible = !open;
     this._panel.visible = open;
+    this._keysReleased = false;
+    if (!open) this._dropKeys();
     if (this._tunerRoot) this._tunerRoot.visible = open;
     this._showRoot(open || !!this._spec.visible);
     if (open) { this._action('opened:'); this._startPoll(); } else this._stopPoll();

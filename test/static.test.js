@@ -69,12 +69,15 @@ check('GNOME helper draws the pill and reports clicks', /SetPill/.test(extJs) &&
 check('GNOME helper only emits well-formed actions', /ACTION_RE = \/\^\[a-z\]\+:\[a-z0-9\]\*\$\//.test(extJs) && /if \(!ACTION_RE\.test\(a\)\) return;/.test(extJs));
 check('GNOME helper ships its stylesheet and the installer copies it', exists(ext + '/stylesheet.css') && read('gnome-extension/install.sh').includes('stylesheet.css'));
 check('app reads the clipboard at startup', /did-finish-load', \(\) => win\.webContents\.send\('clip:changed'\)/.test(main));
-// The pill itself never takes keyboard focus. The first-run setup card is its own window and does (Tab, Space, Esc),
-// so only that one function is exempt.
+// The main pill never takes keyboard focus (typing in your app is untouched). The first-run setup card does
+// (Tab, Space, Esc), and so does Settings while it is open: only those two places may.
 const setupStart = extJs.indexOf('  _syncSetup() {');
 const setupEnd = extJs.indexOf("  // GNOME's own confirmation dialog:");
-const extNoSetup = extJs.slice(0, setupStart) + extJs.slice(setupEnd);
-check('GNOME helper pill never takes keyboard focus', setupStart > 0 && setupEnd > setupStart && !/can_focus:\s*true/.test(extNoSetup) && (extNoSetup.match(/can_focus:\s*false/g) || []).length >= 2 && !/grab_key_focus/.test(extNoSetup));
+const keysStart = extJs.indexOf('  _syncKeys(at) {');
+const keysEnd = extJs.indexOf('  _dropKeys() {');
+const extNoSetup = [[setupStart, setupEnd], [keysStart, keysEnd]].sort((x, y) => y[0] - x[0]).reduce((t, [a, b]) => t.slice(0, a) + t.slice(b), extJs);
+check('GNOME helper pill never takes keyboard focus outside Settings', keysEnd > keysStart && keysStart > 0 && (keysEnd < setupStart || keysStart > setupEnd) && setupEnd > setupStart && !/can_focus:\s*true/.test(extNoSetup) && (extNoSetup.match(/can_focus:\s*false/g) || []).length >= 2 && !/grab_key_focus|pushModal/.test(extNoSetup));
+check('Settings takes the keyboard only while it is the view shown, and gives it back on a click elsewhere', /this\._spec\.view === 'settings'/.test(extJs.slice(keysStart, keysEnd)) && /this\._dropKeys\(\)/.test(extJs.slice(keysStart, keysEnd)) && /Clutter\.KEY_Escape/.test(extJs));
 check('only the setup card may take keyboard focus, and it is keyboard-operable', /key-press-event/.test(extJs.slice(setupStart, setupEnd)) && /Escape/.test(extJs.slice(setupStart, setupEnd)));
 check('the setup card moves only while the mouse button is held, and a missed release cannot leave it following the pointer', /BUTTON1_MASK/.test(extJs.slice(setupStart, setupEnd)) && /_setupDragEnd/.test(extJs.slice(extJs.indexOf('  _closeSetup() {'), setupStart)));
 check('the first-run card is a welcome with no questions: Got it or Open Settings, nothing else to answer', /finish\('ok'\)/.test(extJs.slice(setupStart, setupEnd)) && /finish\('settings'\)/.test(extJs.slice(setupStart, setupEnd)) && !/Step ' \+/.test(extJs.slice(setupStart, setupEnd)) && !/optSel/.test(extJs.slice(setupStart, setupEnd)));
@@ -85,7 +88,7 @@ check('GNOME pill tucks away on outside clicks and window switches', /captured-e
 check('GNOME pill can be dragged and its height is remembered', /'moved:'/.test(extJs) && /pillYFrac/.test(main) && /kind === 'moved'/.test(main));
 check('GNOME pill colours come from the app and are validated', /COLOR_RE = \/\^#\[0-9a-fA-F\]\{6\}\$\//.test(extJs) && /COLOR_RE\.test\(o\.color\)/.test(extJs) && ['slack','jira','confluence','email','gdocs','markdown','text'].every((k) => new RegExp(k + ": '#[0-9a-f]{6}'").test(main)));
 check('GNOME pill buttons press in and show progress right away', /notify::pressed/.test(extJs) && /fb-busy/.test(extJs) && /busy: 'Saving…'/.test(main));
-check('GNOME pill draws no shadow (no halo, no trails)', !/box-shadow/.test(read(ext + '/stylesheet.css')));
+check('GNOME pill draws no shadow (no halo, no trails); only inset focus rings', !/box-shadow:(?!\s*inset)/.test(read(ext + '/stylesheet.css')));
 check('GNOME pill tucks away when you click an app window', /global\.get_pointer\(\)/.test(extJs) && /_startPoll\(\)/.test(extJs) && /_stopPoll\(\)[\s\S]*_clearTimers/.test(extJs));
 check('one-click paste goes through the helper and only after a successful fix', /Paste\(shift\)/.test(extJs) && /from === 'paste'[\s\S]*?if \(r\.ok\)[\s\S]*?pasteNow\(/.test(main) && /function pasteNow[\s\S]*?shellPaste\(shift\)/.test(main));
 check('own clipboard writes are told apart by content (loosely) with a short just-written grace', /const ours = sameText \|\| justWrote/.test(main) && /ownText = text;/.test(main) && /ownWriteUntil = Date\.now\(\) \+ 1500/.test(main));
@@ -105,7 +108,7 @@ check('paste waits until you let go of the shortcut keys', /mods & HELD\) !== 0 
 check('pill sizes are defined', /\.fb-size-s \.fb-panel/.test(read(ext + '/stylesheet.css')) && /\.fb-size-l \.fb-panel/.test(read(ext + '/stylesheet.css')));
 check('PDFs are printed with scripts off, nothing loaded but images, temp file removed', /javascript: false, sandbox: true/.test(main) && /default-src \\'none\\'; img-src https: data:/.test(main) && /fs\.unlinkSync\(tmp\)/.test(main));
 check('Slack channel comes from the window title only (no Slack API, no token)', /slackTarget/.test(read('lib/source.js')) && !/slack\.com\/api/.test(main + read('lib/slack.js')) && /copyPlace\(\)/.test(main));
-check('✕ closes the pill completely and a shortcut or the menu brings it back', /kind === 'hide'\) hidePillCompletely\(\)/.test(main) && /if \(!settings\.pillEnabled\) \{ settings\.pillEnabled = true/.test(main) && /this\._action\('hide:'\)/.test(extJs));
+check('✕ closes the pill completely and a shortcut or the menu brings it back', /kind === 'hide'\) hidePillCompletely\(\)/.test(main) && /if \(!settings\.pillEnabled\) \{ settings\.pillEnabled = true/.test(main) && /'Close', \(\) => this\._setOpen\(false\)/.test(extJs) && /label: 'Hide ' \+ APP_NAME, .*action: 'hide:'/.test(read('daemon/core.js')));
 check('app uses the GNOME pill when available', /usingShellPill\(\)/.test(main) && /setShellPill/.test(main));
 check('GNOME pill sizes itself from what is showing (tab or panel)', /const shown = this\._open \? this\._panel : this\._handle;/.test(extJs) && !/this\._root\.get_preferred_width/.test(extJs));
 check('GNOME helper cleans up on disable', /disable\(\)[\s\S]*removeChrome[\s\S]*unexport/.test(extJs) && /disconnect/.test(extJs) && /_clearTimers\(\)/.test(extJs));
