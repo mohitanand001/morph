@@ -99,6 +99,96 @@ def build_pipeline():
     return "v2", PPStructure(table=True, ocr=True, layout=True, show_log=False)
 
 
+def find_ocr(obj, best=None):
+    """The OCR'd words with their boxes: the dict with the most rec_texts anywhere in the result."""
+    if isinstance(obj, dict):
+        texts = obj.get("rec_texts")
+        boxes = obj.get("rec_boxes")
+        if boxes is None and obj.get("rec_polys") is not None:
+            boxes = [[min(p[0] for p in q), min(p[1] for p in q), max(p[0] for p in q), max(p[1] for p in q)] for q in obj["rec_polys"]]
+        if isinstance(texts, list) and boxes is not None and len(texts) == len(boxes) and (best is None or len(texts) > len(best[0])):
+            best = (texts, [list(b)[:4] for b in boxes])
+        for val in obj.values():
+            best = find_ocr(val, best)
+    elif isinstance(obj, (list, tuple)):
+        for item in obj:
+            best = find_ocr(item, best)
+    return best
+
+
+def grid_from_words(texts, boxes):
+    """Rebuild a table from where the words are: rows by height, columns by overlapping horizontal ranges.
+    On a clean screenshot of a grid this is more faithful than the table-structure model. None if it is not a grid."""
+    items = []
+    for t, b in zip(texts, boxes):
+        t = str(t).strip()
+        try:
+            x1, y1, x2, y2 = (float(v) for v in b)
+        except (TypeError, ValueError):
+            continue
+        if t and x2 > x1 and y2 > y1:
+            items.append({"t": t, "x1": x1, "y1": y1, "x2": x2, "y2": y2, "yc": (y1 + y2) / 2})
+    if len(items) < 4:
+        return None
+    hs = sorted(i["y2"] - i["y1"] for i in items)
+    h = hs[len(hs) // 2]
+    rows = []
+    for it in sorted(items, key=lambda i: i["yc"]):
+        if rows and abs(it["yc"] - sum(i["yc"] for i in rows[-1]) / len(rows[-1])) <= 0.5 * h:
+            rows[-1].append(it)
+        else:
+            rows.append([it])
+    most = max(len(r) for r in rows)
+    if most < 2:
+        return None
+    # The table is the longest run of rows with at least half as many words as the fullest row (titles drop out).
+    main = [len(r) >= max(2, (most + 1) // 2) for r in rows]
+    best, cur = (0, 0), None
+    for i, ok in enumerate(main + [False]):
+        if ok and cur is None:
+            cur = i
+        elif not ok and cur is not None:
+            if i - cur > best[1] - best[0]:
+                best = (cur, i)
+            cur = None
+    rows = rows[best[0]:best[1]]
+    if len(rows) < 2:
+        return None
+    # Columns from the body (the header row can be wider or narrower than its column).
+    body = [w for r in (rows[1:] if len(rows) > 2 else rows) for w in r]
+    bands = []
+    for w in sorted(body, key=lambda i: i["x1"]):
+        if bands and w["x1"] <= bands[-1][1] + 0.3 * h:
+            bands[-1][1] = max(bands[-1][1], w["x2"])
+        else:
+            bands.append([w["x1"], w["x2"]])
+    if len(bands) < 2:
+        return None
+
+    def band_of(w):
+        def score(b):
+            overlap = min(w["x2"], b[1]) - max(w["x1"], b[0])
+            centre = abs((w["x1"] + w["x2"]) / 2 - (b[0] + b[1]) / 2)
+            return (overlap, -centre)
+        return max(range(len(bands)), key=lambda k: score(bands[k]))
+
+    grid = []
+    for r in rows:
+        cells = [[] for _ in bands]
+        for w in sorted(r, key=lambda i: i["x1"]):
+            cells[band_of(w)].append(w["t"])
+        grid.append([" ".join(c) for c in cells])
+    filled = sum(1 for r in grid for c in r if c) / float(len(grid) * len(bands))
+    return grid if filled >= 0.6 else None
+
+
+def grid_html(grid):
+    esc = lambda t: t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    head = "<tr>" + "".join("<th>" + esc(c) + "</th>" for c in grid[0]) + "</tr>"
+    body = "".join("<tr>" + "".join("<td>" + esc(c) + "</td>" for c in r) + "</tr>" for r in grid[1:])
+    return "<table>" + head + body + "</table>"
+
+
 def read_table(path):
     kind, pipe = build_pipeline()
     if kind == "v3":
@@ -106,11 +196,33 @@ def read_table(path):
     else:
         import cv2
         results = pipe(cv2.imread(path))
+    # First choice: the grid rebuilt from the words' positions. Fallback: the table-structure model's HTML.
+    words = find_ocr(results)
+    grid = grid_from_words(*words) if words else None
+    if grid:
+        html = grid_html(grid)
+        return {"ok": True, "html": html, "cells": count_cells(html), "how": "grid"}
     tables = find_tables(results, [])
     if not tables:
         return {"ok": False, "error": "no_table"}
     html = clean_table(max(tables, key=len))
     return {"ok": True, "html": html, "cells": count_cells(html)}
+
+
+def _grid_salary_sheet():
+    """A title, a logo, a header and three rows, as the OCR reports them (numbers right-aligned): the grid
+    comes out as five clean columns with the title left out."""
+    words = [("NYGGS", 80, 150, 190, 180), ("SALARY SHEET", 300, 130, 830, 200),
+             ("Employee Name", 85, 245, 305, 280), ("Basic", 375, 245, 445, 280), ("Allowances", 520, 245, 680, 280),
+             ("Deductions", 715, 245, 870, 280), ("Net Salary", 912, 245, 1055, 280)]
+    for y, row in ((320, ("John Doe", "4.000", "1.000", "300", "4.700")), (380, ("Jane Smith", "4.500", "800", "300", "5.000")),
+                   (440, ("Michael Johnson", "4.800", "1.200", "400", "5.600"))):
+        xs = ((97, 97 + 12 * len(row[0])), (385, 458), (568 + (5 - len(row[2])) * 14, 640), (770, 820), (956, 1030))
+        words += [(t, x[0], y, x[1], y + 32) for t, x in zip(row, xs)]
+    g = grid_from_words([w[0] for w in words], [list(w[1:]) for w in words])
+    return g == [["Employee Name", "Basic", "Allowances", "Deductions", "Net Salary"],
+                 ["John Doe", "4.000", "1.000", "300", "4.700"], ["Jane Smith", "4.500", "800", "300", "5.000"],
+                 ["Michael Johnson", "4.800", "1.200", "400", "5.600"]]
 
 
 def _make_drops_unknown():
@@ -140,6 +252,7 @@ def selftest():
         "script" not in clean_table(evil) and "onclick" not in clean_table(evil),
         count_cells("<table><tr><th>a</th><td>b</td></tr></table>") == 2,
         _make_drops_unknown(),
+        _grid_salary_sheet(),
         "use_formula_recognition" not in PIPELINE_OPTIONS["TableRecognitionPipelineV2"],
         all(o.get("enable_mkldnn") is False for o in PIPELINE_OPTIONS.values()) and os.environ.get("FLAGS_use_mkldnn") == "0",
     ]
