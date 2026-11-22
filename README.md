@@ -14,9 +14,9 @@ Open a terminal and run:
 curl -fsSL https://mohitanand001.github.io/morph/install.sh | bash
 ```
 
-The installer checks the download against a fingerprint before it installs anything. A short setup page opens by itself: choose your apps, then press Start. No log out is needed.
+The installer checks the download against a fingerprint before it installs anything. A short welcome opens by itself; there is nothing to set up. No log out is needed.
 
-Needs GNOME (tested on Ubuntu with Wayland) and `gjs`, which GNOME already includes. Other commands: `morph --status`, `--restart`, `--setup` (show the setup page again), `--update`, `--uninstall`.
+Needs GNOME (tested on Ubuntu with Wayland) and `gjs`, which GNOME already includes. Other commands: `morph --status`, `--restart`, `--setup` (show the welcome again), `--update`, `--uninstall`.
 
 You can read the installer first: [`site/install.sh`](site/install.sh).
 
@@ -32,7 +32,7 @@ You can read the installer first: [`site/install.sh`](site/install.sh).
 ## Privacy
 
 - Morph never stores what you copy and never sends it anywhere. Conversion happens on your computer.
-- You choose when Morph may read the clipboard: only copies from your listed apps, or from all apps except password managers. Copies that an app marks as secret are always ignored.
+- Morph works in all apps by default, except password managers. In Settings → Apps you can limit it to only the apps you pick. Copies that an app marks as secret are always ignored.
 - Settings, Privacy shows a log of what Morph read: time, app and size, never the content.
 - The only network use is an optional daily update check and the optional OCR install.
 - `morph --uninstall` removes the program, the GNOME helper, settings, logs and caches.

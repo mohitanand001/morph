@@ -43,7 +43,7 @@ import { Slider } from 'resource:///org/gnome/shell/ui/slider.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const PILL_VERSION = 22;
+const PILL_VERSION = 23;
 const IFACE = `
 <node>
   <interface name="dev.morph.Focus">
@@ -1107,41 +1107,29 @@ export default class FormatBridgeHelper extends Extension {
     try { Main.layoutManager.removeChrome(w); } catch (e) { /* gone */ }
     try { w.destroy(); } catch (e) { /* gone */ }
   }
+  // The welcome card (v23+): shown once after install. No questions: it says what Morph does and where to change it.
+  // spec.setup = { welcome: true, title, body: [text], apps: [{ name, logo }], foot, ok, settings }.
   _syncSetup() {
     const st = this._spec && this._spec.setup && typeof this._spec.setup === 'object' ? this._spec.setup : null;
-    if (!st) { this._closeSetup(); this._setupAnswered = false; return; }
+    if (!st || !st.welcome) { this._closeSetup(); this._setupAnswered = false; return; }
     if (this._setupDlg || this._setupAnswered) return;
-    const apps = Array.isArray(st.apps) ? st.apps.slice(0, 14).map((a) => ({ name: str(a && a.name, 30), on: !!(a && a.on), dest: str(a && a.logo || a && a.dest, 20) })) : [];
-    // Switches under the apps (v17+): { id: 'all' | 'auto', label, sub, on }. Their answers follow the app bits.
-    // Choice groups under the apps (v19+): { id, title, sel, choices: [{ label, sub, bit }] }; the chosen choice's bit is the answer.
-    const opts = (Array.isArray(st.opts) ? st.opts.slice(0, 3) : []).map((o) => {
-      const choices = (o && Array.isArray(o.choices) ? o.choices.slice(0, 3) : []).map((c) => ({ label: str(c && c.label, 70), sub: str(c && c.sub, 200), bit: c && c.bit === '1' ? '1' : '0' }));
-      const sel = Number.isInteger(o && o.sel) && o.sel >= 0 && o.sel < choices.length ? o.sel : 0;
-      return { id: str(o && o.id, 10), title: str(o && o.title, 40), sel, choices };
-    }).filter((o) => o.choices.length >= 2);
-    const allSel = (sel) => opts.some((o, i) => o.id === 'all' && o.choices[sel[i]].bit === '1'); // scope: every app
-    const defSel = opts.map((o) => o.sel);
-    const defBits = (st.updOn === false ? '0' : '1') + apps.map((a) => (allSel(defSel) || a.on ? '1' : '0')).join('') + opts.map((o) => o.choices[o.sel].bit).join('');
+    const apps = Array.isArray(st.apps) ? st.apps.slice(0, 14).map((a) => ({ name: str(a && a.name, 30), logo: str(a && a.logo, 20) })) : [];
     try {
       // Every length below is a CSS length, so GNOME scales them all together. No pixel widths on actors.
-      const ACC = '#2aa198', INK = '#0a3a45', CREAM = '#fdf6e3', LINE = '#ddd3b4', TINT = '#e3efe1', TINT2 = '#d3e8dc', RED = '#dc322f';
-      const picks = apps.map((a) => a.on);
-      let upd = st.updOn !== false, done = false;
-      const optSel = opts.map((o) => o.sel);
-      const isAll = () => allSel(optSel);
-      const bits = () => (upd ? '1' : '0') + picks.map((b) => (isAll() || b ? '1' : '0')).join('') + opts.map((o, i) => o.choices[optSel[i]].bit).join('');
-      const finish = (useDefaults) => { if (done) return; done = true; this._setupAnswered = true; this._closeSetup(); this._send('setup:' + (useDefaults ? defBits : bits())); };
+      const ACC = '#2aa198', INK = '#0a3a45', CREAM = '#fdf6e3', LINE = '#ddd3b4', TINT = '#e3efe1', RED = '#dc322f';
+      let done = false;
+      const finish = (answer) => { if (done) return; done = true; this._setupAnswered = true; this._closeSetup(); this._send('setup:' + answer); };
       let sc = 1; try { sc = St.ThemeContext.get_for_stage(global.stage).scale_factor || 1; } catch (e) { /* 1 */ }
       const m = Main.layoutManager.primaryMonitor;
       const cardW = Math.max(260, Math.min(400, Math.floor(m.width / sc) - 40));
       const cols = cardW < 340 ? 1 : 2;
-      const card = vbox({ reactive: true, style: 'width: ' + cardW + 'px; background-color: ' + CREAM + '; color: ' + INK + '; border: 1px solid ' + LINE + '; border-radius: 14px; padding: 18px 20px 16px 20px; spacing: 6px;' });
+      const card = vbox({ reactive: true, style: 'width: ' + cardW + 'px; background-color: ' + CREAM + '; color: ' + INK + '; border: 1px solid ' + LINE + '; border-radius: 14px; padding: 18px 20px 16px 20px; spacing: 8px;' });
       const text = (t, style) => { const l = new St.Label({ text: t, x_expand: true, style: 'color: ' + INK + '; ' + style }); l.clutter_text.set_ellipsize(0); l.clutter_text.line_wrap = true; return l; };
       const ring = 'box-shadow: 0 0 0 2px rgba(42,161,152,0.55);';
-      // Title row with the close button: a 34px target, a smaller glyph.
+      // Title row with the close button: a 34px target, a smaller glyph. Closing means the same as "Got it".
       const head = new St.BoxLayout({ x_expand: true });
       head.add_child(text(str(st.title, 60), 'font-weight: 600; font-size: 16pt;'));
-      const x = new St.Button({ reactive: true, can_focus: true, accessible_name: 'Close setup', y_align: Clutter.ActorAlign.START });
+      const x = new St.Button({ reactive: true, can_focus: true, accessible_name: 'Close', y_align: Clutter.ActorAlign.START });
       const xl = new St.Label({ text: '✕', x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER, x_expand: true, y_expand: true });
       x.set_child(xl);
       const xPaint = () => {
@@ -1149,189 +1137,57 @@ export default class FormatBridgeHelper extends Extension {
         x.set_style('width: 34px; height: 34px; border-radius: 17px; background-color: ' + (hot ? RED : 'transparent') + ';' + (foc ? ' ' + ring : ''));
         xl.set_style('font-size: 11pt; color: ' + (hot ? CREAM : INK) + ';');
       };
-      x.connect('notify::hover', xPaint);
-      x.connect('key-focus-in', xPaint);
-      x.connect('key-focus-out', xPaint);
-      x.connect('clicked', () => finish(true));
+      ['notify::hover', 'key-focus-in', 'key-focus-out'].forEach((sig) => x.connect(sig, xPaint));
+      x.connect('clicked', () => finish('ok'));
       xPaint();
       head.add_child(x);
       card.add_child(head);
-      // Three steps, one on screen at a time: where Morph formats for, how it reads and converts, then updates and start.
-      const NAMES = ['Where it works', 'Convert', 'Finish'];
-      const stepLabel = text('', 'font-size: 9pt; font-weight: 600; opacity: 0.7;');
-      const bars = [0, 1, 2].map(() => new St.Widget({ x_expand: true }));
-      const barRow = new St.BoxLayout({ x_expand: true, style: 'spacing: 6px; margin: 2px 0 6px 0;' });
-      bars.forEach((b) => barRow.add_child(b));
-      card.add_child(stepLabel);
-      card.add_child(barRow);
-      const steps = [0, 1, 2].map(() => vbox({ x_expand: true, style: 'spacing: 6px;' }));
-      const stage = vbox({ x_expand: true, y_expand: true });
-      steps.forEach((sv) => stage.add_child(sv));
-      card.add_child(stage);
-      const S1 = steps[0], S2 = steps[1], S3 = steps[2];
-      S1.add_child(text(str(st.lede, 260), 'font-size: 10pt; opacity: 0.8; margin-bottom: 4px;'));
-      const scopeBox = vbox({ x_expand: true });           // "Where should Morph work?": all apps, or only some
-      const gridBox = vbox({ x_expand: true, style: 'spacing: 6px;' }); // the app tiles: only for "only the apps I choose"
-      S1.add_child(scopeBox);
-      S1.add_child(text(str(st.fmtNote, 300), 'font-size: 8.5pt; opacity: 0.7; margin: 2px 0 2px 0;'));
-      S1.add_child(gridBox);
-      gridBox.add_child(text(str(st.appsLabel, 80), 'font-size: 9pt; font-weight: 600; opacity: 0.7; margin-top: 4px;'));
-      // App grid: two columns, or one on a narrow screen.
-      const tiles = [];
-      const paintTile = (t) => {
-        const on = picks[t.i], hot = t.b.hover, foc = t.b.has_key_focus();
-        t.b.set_style('border-radius: 9px; padding: 7px 9px; border: 1px solid ' + (foc ? INK : (on ? ACC : LINE)) + '; background-color: ' + (on ? (hot ? TINT2 : TINT) : (hot ? '#f4ecd4' : CREAM)) + ';' + (foc ? ' ' + ring : ''));
-        t.box.set_style('width: 14px; height: 14px; border-radius: 4px; border: 1px solid ' + (on ? ACC : '#93a1a1') + '; background-color: ' + (on ? ACC : 'transparent') + ';');
-        t.tick.opacity = on ? 255 : 0;
-        t.b.checked = on;
-      };
-      for (let r = 0; r < apps.length; r += cols) {
-        // Homogeneous: every tile in a row, and every row, gets the same width.
-        const row = new St.Widget({ x_expand: true, layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 8 }) });
-        for (let c = 0; c < cols && r + c < apps.length; c++) {
-          const i = r + c;
-          const b = new St.Button({ reactive: true, can_focus: true, toggle_mode: true, x_expand: true, accessible_name: apps[i].name });
-          const line = new St.BoxLayout({ x_expand: true, style: 'spacing: 8px;' });
-          const box = new St.Widget({ y_align: Clutter.ActorAlign.CENTER, layout_manager: new Clutter.BinLayout() });
-          const tick = new St.Label({ text: '✓', x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER, x_expand: true, y_expand: true, style: 'font-size: 8pt; font-weight: bold; color: ' + CREAM + ';' });
-          box.add_child(tick);
-          line.add_child(box);
-          const logo = this._destIcon(apps[i].dest, true); // the same logo the pill uses
-          if (logo) line.add_child(logo);
-          line.add_child(text(apps[i].name, 'font-weight: 600; font-size: 10.5pt;'));
-          b.set_child(line);
-          const t = { i, b, box, tick };
-          tiles.push(t);
-          b.connect('clicked', () => { picks[i] = !picks[i]; tiles.forEach(paintTile); refresh(); });
-          ['notify::hover', 'key-focus-in', 'key-focus-out'].forEach((sig) => b.connect(sig, () => paintTile(t)));
-          row.add_child(b);
+      (Array.isArray(st.body) ? st.body.slice(0, 4) : []).forEach((t, i) => card.add_child(text(str(t, 300), 'font-size: 10.5pt;' + (i ? ' opacity: 0.8;' : ''))));
+      // The tools Morph converts for, as small labelled logos (two columns, one on a narrow screen).
+      if (apps.length) {
+        const grid = vbox({ x_expand: true, style: 'spacing: 6px; margin: 4px 0 2px 0;' });
+        for (let i = 0; i < apps.length; i += cols) {
+          const row = new St.BoxLayout({ x_expand: true, style: 'spacing: 6px;' });
+          try { row.layout_manager.homogeneous = true; } catch (e) { /* fine */ }
+          apps.slice(i, i + cols).forEach((a) => {
+            const chip = new St.BoxLayout({ x_expand: true, style: 'spacing: 8px; padding: 6px 10px; border-radius: 9px; border: 1px solid ' + LINE + '; background-color: ' + TINT + ';' });
+            const ic = this._destIcon(a.logo, true);
+            if (ic) { ic.y_align = Clutter.ActorAlign.CENTER; chip.add_child(ic); }
+            const nl = new St.Label({ text: a.name, y_align: Clutter.ActorAlign.CENTER, style: 'color: ' + INK + '; font-size: 10pt; font-weight: 600;' });
+            chip.add_child(nl);
+            row.add_child(chip);
+          });
+          if (apps.slice(i, i + cols).length < cols) row.add_child(new St.Widget({ x_expand: true }));
+          grid.add_child(row);
         }
-        gridBox.add_child(row);
+        card.add_child(grid);
       }
-      gridBox.add_child(text(str(st.appsNote, 200), 'font-size: 9pt; opacity: 0.75; margin: 2px 0 4px 0;'));
-      // A switch row: a label, a line of explanation, and the switch itself. Used for the options and for updates.
-      const repaints = [];
-      const switchRow = (parent, label, sub, get, set) => {
-        const ub = new St.Button({ reactive: true, can_focus: true, toggle_mode: true, x_expand: true, accessible_name: label });
-        const urow = new St.BoxLayout({ x_expand: true, style: 'spacing: 10px;' });
-        const ucol = vbox({ x_expand: true });
-        ucol.add_child(text(label, 'font-weight: 600; font-size: 10.5pt;'));
-        ucol.add_child(text(sub, 'font-size: 9pt; opacity: 0.75;'));
-        const track = new St.Widget({ y_align: Clutter.ActorAlign.START, layout_manager: new Clutter.BinLayout() });
-        const knob = new St.Widget({ x_expand: true, y_expand: true });
-        track.add_child(knob);
-        urow.add_child(ucol); urow.add_child(track); ub.set_child(urow);
+      if (st.foot) card.add_child(text(str(st.foot, 200), 'font-size: 9pt; opacity: 0.7;'));
+      // Buttons: Open Settings (quiet) and Got it (main).
+      const btn = (label, main) => {
+        const b = new St.Button({ reactive: true, can_focus: true, x_expand: main, accessible_name: label });
+        const l = new St.Label({ text: label, x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER, x_expand: true });
+        b.set_child(l);
         const paint = () => {
-          const on = get(), foc = ub.has_key_focus();
-          ub.set_style('border-radius: 9px; padding: 8px 10px; margin-top: 2px; border: 1px solid ' + (foc ? INK : LINE) + '; background-color: ' + (ub.hover ? '#f4ecd4' : CREAM) + ';' + (foc ? ' ' + ring : ''));
-          track.set_style('width: 30px; height: 17px; border-radius: 9px; margin-top: 2px; background-color: ' + (on ? ACC : '#b9c2bd') + ';');
-          knob.set_style('width: 13px; height: 13px; border-radius: 7px; margin: 2px; background-color: ' + CREAM + ';');
-          knob.set_x_align(on ? Clutter.ActorAlign.END : Clutter.ActorAlign.START);
-          knob.set_y_align(Clutter.ActorAlign.CENTER);
-          ub.checked = on;
+          const foc = b.has_key_focus();
+          if (main) b.set_style('background-color: ' + (b.hover ? '#25918a' : ACC) + '; border: 1px solid ' + ACC + '; border-radius: 9px; padding: 8px 14px;' + (foc ? ' ' + ring : ''));
+          else b.set_style('border-radius: 9px; padding: 8px 14px; border: 1px solid ' + (foc ? INK : LINE) + '; background-color: ' + (b.hover ? '#f4ecd4' : CREAM) + ';' + (foc ? ' ' + ring : ''));
+          l.set_style('color: ' + (main ? CREAM : INK) + '; font-weight: 600; font-size: 11pt;');
         };
-        ['notify::hover', 'key-focus-in', 'key-focus-out'].forEach((sig) => ub.connect(sig, paint));
-        ub.connect('clicked', () => { set(!get()); paint(); });
-        repaints.push(paint);
-        parent.add_child(ub);
+        ['notify::hover', 'key-focus-in', 'key-focus-out'].forEach((sig) => b.connect(sig, paint));
+        paint();
+        return b;
       };
-      // A choice group: a small heading, then one row per choice. Exactly one is chosen; a row says what it does in full.
-      S2.add_child(text('Choose when Morph converts what you copy. You can change this any time in Settings.', 'font-size: 10pt; opacity: 0.8; margin-bottom: 4px;'));
-      opts.forEach((o, gi) => {
-        (o.id === 'all' ? scopeBox : S2).add_child(text(o.title, 'font-size: 9pt; font-weight: 600; opacity: 0.7; margin-top: 6px;'));
-        const rows = [];
-        o.choices.forEach((c, k) => {
-          const rb = new St.Button({ reactive: true, can_focus: true, toggle_mode: true, x_expand: true, accessible_name: o.title + ': ' + c.label });
-          const rr = new St.BoxLayout({ x_expand: true, style: 'spacing: 10px;' });
-          const dot = new St.Widget({ y_align: Clutter.ActorAlign.START, layout_manager: new Clutter.BinLayout() });
-          const core = new St.Widget({ x_expand: true, y_expand: true, x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER });
-          dot.add_child(core);
-          const col = vbox({ x_expand: true });
-          col.add_child(text(c.label, 'font-weight: 600; font-size: 10.5pt;'));
-          if (c.sub) col.add_child(text(c.sub, 'font-size: 9pt; opacity: 0.75;'));
-          rr.add_child(dot); rr.add_child(col); rb.set_child(rr);
-          const paint = () => {
-            const on = optSel[gi] === k, foc = rb.has_key_focus();
-            rb.set_style('border-radius: 9px; padding: 7px 10px; margin-top: 2px; border: 1px solid ' + (foc ? INK : (on ? ACC : LINE)) + '; background-color: ' + (on ? (rb.hover ? TINT2 : TINT) : (rb.hover ? '#f4ecd4' : CREAM)) + ';' + (foc ? ' ' + ring : ''));
-            dot.set_style('width: 14px; height: 14px; margin-top: 2px; border-radius: 8px; border: 1px solid ' + (on ? ACC : '#93a1a1') + ';');
-            core.set_style('width: 8px; height: 8px; border-radius: 4px; background-color: ' + (on ? ACC : 'transparent') + ';');
-            rb.checked = on;
-          };
-          ['notify::hover', 'key-focus-in', 'key-focus-out'].forEach((sig) => rb.connect(sig, () => rows.forEach((f) => f())));
-          rb.connect('clicked', () => { optSel[gi] = k; rows.forEach((f) => f()); applyScope(); });
-          rows.push(paint); repaints.push(paint);
-          (o.id === 'all' ? scopeBox : S2).add_child(rb);
-        });
-      });
-      S3.add_child(text('Almost done', 'font-size: 12pt; font-weight: 600; margin-top: 2px;'));
-      const summary = text('', 'font-size: 10pt; opacity: 0.85; margin-bottom: 4px;');
-      S3.add_child(summary);
-      switchRow(S3, str(st.updLabel, 60), str(st.updSub, 160), () => upd, (v) => { upd = v; });
-      // The buttons: Back (from step 2), then Next, which becomes Start on the last step. Next is off while no app is ticked.
-      let step = 0;
-      const go = new St.Button({ reactive: true, can_focus: true, x_expand: true, accessible_name: 'Next' });
-      const goL = new St.Label({ text: 'Next', x_align: Clutter.ActorAlign.CENTER, x_expand: true });
-      go.set_child(goL);
-      const back = new St.Button({ reactive: true, can_focus: true, accessible_name: 'Back' });
-      const backL = new St.Label({ text: 'Back', x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER });
-      back.set_child(backL);
-      const msg = text(str(st.none, 80), 'font-size: 9pt; color: ' + RED + ';');
-      gridBox.add_child(msg);
-      const nav = new St.BoxLayout({ x_expand: true, style: 'spacing: 8px; margin-top: 8px;' });
-      nav.add_child(back); nav.add_child(go);
+      const nav = new St.BoxLayout({ x_expand: true, style: 'spacing: 8px; margin-top: 6px;' });
+      const set = btn(str(st.settings, 30) || 'Open Settings', false);
+      const go = btn(str(st.ok, 30) || 'Got it', true);
+      set.connect('clicked', () => finish('settings'));
+      go.connect('clicked', () => finish('ok'));
+      nav.add_child(set); nav.add_child(go);
       card.add_child(nav);
-      card.add_child(text('Closing this window keeps these choices. You can change all of them in Settings.', 'font-size: 8pt; opacity: 0.65;'));
-      const paintGo = () => {
-        const ok = step > 0 || isAll() || picks.some(Boolean), foc = go.has_key_focus(), bf = back.has_key_focus();
-        go.reactive = ok; go.can_focus = ok;
-        go.set_style('background-color: ' + (ok ? (go.hover ? '#25918a' : ACC) : '#b9c2bd') + '; border: 1px solid ' + (ok ? ACC : '#b9c2bd') + '; border-radius: 9px; padding: 8px 12px;' + (foc ? ' ' + ring : ''));
-        goL.set_style('color: ' + CREAM + '; font-weight: 600; font-size: 11pt;');
-        back.set_style('border-radius: 9px; padding: 8px 14px; border: 1px solid ' + (bf ? INK : LINE) + '; background-color: ' + (back.hover ? '#f4ecd4' : CREAM) + ';' + (bf ? ' ' + ring : ''));
-        backL.set_style('color: ' + INK + '; font-weight: 600; font-size: 11pt;');
-        msg.opacity = step === 0 && !isAll() && !picks.some(Boolean) ? 255 : 0;
-      };
-      const describe = () => {
-        const names = apps.filter((a, i) => isAll() || picks[i]).map((a) => a.name);
-        const conv = opts.find((o) => o.id !== 'all');
-        const convLabel = conv ? conv.choices[optSel[opts.indexOf(conv)]].label : '';
-        summary.set_text((isAll() ? 'Morph works in every app and can format for ' : 'Morph works only in ') + (names.length > 4 ? names.length + ' tools' : names.join(', ')) + '.' + (convLabel ? '\n• Convert: ' + convLabel + '.' : ''));
-      };
-      // The card is as tall as what is on it: it is re-measured whenever the step or the choice of scope changes.
-      let rw = 0, userMoved = false;
-      const fit = () => {
-        if (!rw || !placed) return;
-        card.set_height(-1);
-        const h = card.get_preferred_height(rw)[1];
-        card.set_height(h);
-        const [cx0, cy0] = card.get_position();
-        if (!userMoved) card.set_position(cx0, Math.max(m.y + 20, Math.round(m.y + (m.height - h) / 2)));
-        else card.set_position(cx0, Math.max(m.y, Math.min(cy0, m.y + m.height - h)));
-      };
-      const applyScope = () => { gridBox.visible = !isAll(); if (step === 0) paintGo(); fit(); };
-      const showStep = (n) => {
-        step = n;
-        steps.forEach((sv, i) => { sv.visible = i === n; });
-        bars.forEach((b, i) => b.set_style('height: 4px; border-radius: 2px; background-color: ' + (i <= n ? ACC : LINE) + ';'));
-        stepLabel.set_text('Step ' + (n + 1) + ' of 3 · ' + NAMES[n]);
-        back.visible = n > 0;
-        goL.set_text(n === 2 ? str(st.start, 30) : 'Next');
-        go.accessible_name = n === 2 ? str(st.start, 30) : 'Next';
-        if (n === 2) describe();
-        gridBox.visible = !isAll();
-        paintGo();
-        fit();
-      };
-      ['notify::hover', 'key-focus-in', 'key-focus-out'].forEach((sig) => { go.connect(sig, paintGo); back.connect(sig, paintGo); });
-      go.connect('clicked', () => {
-        if (step === 0 && !picks.some(Boolean)) return;
-        if (step < 2) { showStep(step + 1); try { go.grab_key_focus(); } catch (e) { /* convenience */ } } else finish(false);
-      });
-      back.connect('clicked', () => { if (step > 0) { showStep(step - 1); try { go.grab_key_focus(); } catch (e) { /* convenience */ } } });
-      const refresh = paintGo;
-      tiles.forEach(paintTile); repaints.forEach((f) => f()); showStep(0);
       // Keyboard: Tab moves between the controls, Space or Enter presses, Esc closes.
       card.connect('key-press-event', (a, ev) => {
-        if (ev.get_key_symbol() === Clutter.KEY_Escape) { finish(true); return Clutter.EVENT_STOP; }
+        if (ev.get_key_symbol() === Clutter.KEY_Escape) { finish('ok'); return Clutter.EVENT_STOP; }
         return Clutter.EVENT_PROPAGATE;
       });
       // Drag from any empty part of the card, only while the mouse button is really held: if a release is ever
@@ -1349,7 +1205,6 @@ export default class FormatBridgeHelper extends Extension {
         ids.push(global.stage.connect('motion-event', (st2, e2) => {
           if (!(e2.get_state() & Clutter.ModifierType.BUTTON1_MASK)) { end(); return Clutter.EVENT_PROPAGATE; }
           const [mx, my] = e2.get_coords();
-          userMoved = true;
           card.set_position(Math.round(cx + mx - px), Math.round(cy + my - py));
           return Clutter.EVENT_STOP;
         }));
@@ -1370,7 +1225,6 @@ export default class FormatBridgeHelper extends Extension {
       card.set_position(Math.round(m.x + m.width / 2 - 200 * sc), Math.round(m.y + m.height / 4));
       Main.layoutManager.addTopChrome(card);
       let placed = false, tries = 0;
-      const rwSet = (v) => { rw = v; };
       const place = () => {
         if (this._setupDlg !== card) return GLib.SOURCE_REMOVE;
         // Wait until GNOME has laid the card out (it has a real width), then size, place and show it in one go.
@@ -1384,13 +1238,12 @@ export default class FormatBridgeHelper extends Extension {
         if (!placed) card.set_position(Math.round(m.x + (m.width - rw) / 2), Math.max(m.y + 20, Math.round(m.y + (m.height - h) / 2)));
         if (!placed) { try { go.grab_key_focus(); } catch (e) { /* keyboard focus is a convenience */ } }
         placed = true;
-        rwSet(rw);
         card.visible = wsOk();
         return GLib.SOURCE_REMOVE;
       };
       GLib.timeout_add(GLib.PRIORITY_DEFAULT, 40, place);
       GLib.timeout_add(GLib.PRIORITY_DEFAULT, 200, place);
-    } catch (e) { log('morph: setup page failed: ' + e); this._closeSetup(); this._send('setup:' + defBits); }
+    } catch (e) { log('morph: welcome card failed: ' + e); this._closeSetup(); this._send('setup:ok'); }
   }
   // GNOME's own confirmation dialog: nothing happens unless the person presses the second button.
   _confirm(o) {
@@ -1614,12 +1467,12 @@ export default class FormatBridgeHelper extends Extension {
       this._editList = vbox({ style_class: 'fb-applist', x_expand: true });
       this._editRows = [];
       this._editItems = on;
-      this._editChips = on.map((x, i) => this._appRow(x, i, true));
+      this._editChips = on.map((x, i) => this._appRow(x, i, !p.appsFixed));
       this._editOrder = on.map((_x, i) => i);
       this._editLayout();
       pane.add_child(this._editList);
       if (off.length) {
-        pane.add_child(this._lbl('fb-subhead', 'Hidden', 20));
+        pane.add_child(this._lbl('fb-subhead', str(p.offLabel, 30) || 'Hidden', 20));
         const list = vbox({ style_class: 'fb-applist', x_expand: true });
         off.forEach((x) => list.add_child(this._appRow(x, -1, false)));
         pane.add_child(list);

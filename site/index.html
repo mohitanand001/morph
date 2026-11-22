@@ -114,7 +114,7 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
   <div class="grid">
     <div class="card"><h3>You need</h3><p>Ubuntu, Fedora Workstation or another GNOME desktop, plus <code>curl</code> and <code>unzip</code>. GNOME's <code>gjs</code> is already part of it.</p></div>
     <div class="card"><h3>What it adds</h3><p>The pill on your screen edge, a small GNOME helper and a <code>morph</code> command. No icon in the top bar.</p></div>
-    <div class="card"><h3>What it reads</h3><p>Your copies and the front window's app name, only on your computer and only as you allow in setup. Nothing is sent anywhere.</p></div>
+    <div class="card"><h3>What it reads</h3><p>Your copies and the front window's app name, only on your computer. Password managers are never read. Nothing is sent anywhere.</p></div>
   </div>
 
   <div class="step" style="margin-top:28px"><div class="n">1</div><div class="body">
@@ -124,9 +124,9 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
   </div></div>
 
   <div class="step"><div class="n">2</div><div class="body">
-    <h3>Answer the short setup</h3>
-    <p>A three-step setup page opens by itself: where Morph should work (all apps, or only the ones you choose), when it converts, and daily update checks. Closing it keeps the recommended choices.</p>
-    <div class="note ok"><b>You should see</b> a slim tab on the right edge of the screen once setup is done. Check any time with <code>morph --status</code>.</div>
+    <h3>Say hello</h3>
+    <p>A short welcome opens by itself. It says what Morph does and lists the tools it converts for. There's nothing to set up: press <b>Got it</b>, or <b>Open Settings</b> if you'd like Morph to work in only some apps.</p>
+    <div class="note ok"><b>You should see</b> a slim tab on the right edge of the screen. Check any time with <code>morph --status</code>.</div>
   </div></div>
 
   <div class="step"><div class="n">3</div><div class="body">
@@ -154,7 +154,7 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
   <p class="sub">A clipboard tool sees a lot, so here is exactly what Morph does. The code is open, so you can check it.</p>
   <div class="grid two">
     <div class="card"><h3>Stays on your computer</h3><p>Morph never stores what you copy and never sends it anywhere. Conversion happens locally.</p></div>
-    <div class="card"><h3>You choose what it reads</h3><p>All apps, or only the apps you pick. Password managers and copies marked secret are always skipped.</p></div>
+    <div class="card"><h3>You choose where it works</h3><p>All apps by default, or only the apps you pick in Settings → Apps. Password managers and copies marked secret are always skipped.</p></div>
     <div class="card"><h3>A log you can see</h3><p>Settings → Privacy lists what Morph read: the time, the app and the size, never the content.</p></div>
     <div class="card"><h3>Network</h3><p>Only an optional daily update check and the optional table OCR download.</p></div>
   </div>
@@ -168,7 +168,7 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
 
 <section id="update">
   <h2>Update</h2>
-  <p class="sub">Morph checks this page once a day if you allowed it in setup. To check yourself, open the pill, then Settings, then <b>Updates</b>. When there's a newer version, <b>Update now</b> installs it and restarts Morph, with no log out. Or from a terminal:</p>
+  <p class="sub">Morph checks this page once a day (you can turn that off in Settings → Updates). To check yourself, open the pill, then Settings, then <b>Updates</b>. When there's a newer version, <b>Update now</b> installs it and restarts Morph, with no log out. Or from a terminal:</p>
   <div class="term"><pre>morph --update</pre><button class="copy" type="button">Copy</button></div>
 </section>
 
@@ -180,10 +180,10 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
 
 <section id="help">
   <h2>Troubleshooting</h2>
-  <details><summary>The setup page or the pill doesn't appear</summary><div class="in">
+  <details><summary>The welcome or the pill doesn't appear</summary><div class="in">
     <p>Run <code>morph --status</code>. If the app is running but nothing shows, switch the GNOME helper off and on: <code>gnome-extensions disable morph-focus@morph.dev; gnome-extensions enable morph-focus@morph.dev</code>.</p>
-    <p>To see the setup page again at any time, run <code>morph --setup</code>.</p></div></details>
-  <details><summary>The pill says "Skipped on purpose"</summary><div class="in"><p>You chose to let Morph read only some apps, and you copied from another one. Pick an app in the pill to convert it anyway, or switch on <b>Read copies from all apps</b> in Settings → Privacy.</p></div></details>
+    <p>To see the welcome again, run <code>morph --setup</code>.</p></div></details>
+  <details><summary>The pill says "Skipped on purpose"</summary><div class="in"><p>You set Morph to work in only some apps, and you copied from another one. Pick an app in the pill to convert it anyway, or switch on <b>All apps</b> in Settings → Apps.</p></div></details>
   <details><summary>I closed the pill with the ✕</summary><div class="in"><p>Press <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>F</kbd>, or run <code>morph --restart</code>.</p></div></details>
   <details><summary>"gjs is missing"</summary><div class="in"><p>It's part of GNOME, so this is rare. On Ubuntu run <code>sudo apt install gjs</code>, on Fedora <code>sudo dnf install gjs</code>.</p></div></details>
   <details><summary>Where does it log?</summary><div class="in"><p>In <code>~/.cache/morph.log</code>. It never contains what you copied. For more detail, run <code>morph --stop</code>, then <code>FB_DEBUG=1 gjs -m ~/.local/share/morph/daemon/gjs-main.js</code> in a terminal.</p></div></details>

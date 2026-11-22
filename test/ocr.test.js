@@ -89,7 +89,7 @@ function desk(opts) {
     const c = createCore(d.io);
     await c.start();
     c.focus({ app: 'slack', title: 'x - Slack' }, 15);
-    c.action('view:settings'); c.action('view:privacy');
+    c.action('view:settings'); c.action('view:ocr');
     const blocks = () => JSON.stringify(d.last().pane.blocks);
     check('off: the pane offers an Enable table OCR button with a confirmation', /Enable table OCR/.test(blocks()) && /1 GB/.test(blocks()) && /ocr:on/.test(blocks()));
     c.action('ocr:on');

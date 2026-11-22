@@ -63,7 +63,7 @@ const general = (d, c) => { c.action('view:settings'); return d.last().pane.opts
   {
     const d = desk(); d.remote = { version: '0.14.0-rc.5' };
     const c = createCore(d.io); await c.start(); d.advance(21000); await settle();
-    check('same version: nothing announced, no update row', d.notes.length === 1 && !general(d, c).some((o) => /Update/.test(o.label)));
+    check('same version: nothing announced, no update row', d.notes.length === 0 && !general(d, c).some((o) => /Update/.test(o.label)));
   }
   {
     const d = desk({ saved: JSON.stringify({ updateCheck: false }) });
@@ -75,7 +75,7 @@ const general = (d, c) => { c.action('view:settings'); return d.last().pane.opts
   {
     const d = desk(); d.io.update.check = async () => null;
     const c = createCore(d.io); await c.start(); d.advance(21000); await settle();
-    check('website unreachable: quietly nothing', d.notes.length === 1);
+    check('website unreachable: quietly nothing', d.notes.length === 0);
   }
 
   // --- with a current helper (v12): real buttons, a manual check, and a confirmation dialog for Uninstall

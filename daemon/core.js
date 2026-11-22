@@ -29,7 +29,7 @@ const SIZE_NAMES = { s: 'Small', m: 'Medium', l: 'Large' };
 const KEY_IDS = ['paste', 'plain', 'pill', 'auto', 'pdf'];
 const APP_NAME = 'Morph';
 const TICK_MS = 1500;
-const PILL_PAGES = ['settings', 'size', 'keys', 'privacy', 'edit', 'updates', 'uninstall', 'about'];
+const PILL_PAGES = ['settings', 'size', 'keys', 'privacy', 'ocr', 'edit', 'updates', 'uninstall', 'about'];
 const TERMINAL_RE = /terminal|konsole|kitty|alacritty|wezterm|tilix|xterm|ghostty/i;
 // Apps that hold passwords: with "read from all apps", copies made in them are never read.
 const PASSWORD_APPS = /1password|bitwarden|keepass|proton[ ._-]?pass|lastpass|dashlane|enpass|nordpass|keeper|roboform|authenticator|seahorse|gnome-keyring|passwords/i;
@@ -66,7 +66,7 @@ const norm = (t) => String(t == null ? '' : t).replace(/\r\n/g, '\n').replace(/\
 function createCore(io) {
   const FB = globalThis.FB;
   const log = io.log || (() => {});
-  const SETTINGS_DEFAULT = { rules: DEFAULT_RULES, pillEnabled: true, pillMode: 'always', pillYFrac: 0.42, pillSide: 'r', pillMonitor: -1, autoFormat: false, linkBack: false, crossLinks: true, tabIcons: false, theme: 'sol-light', size: 'm', shortcuts: null, pillDests: null, atlassianSite: '', seenDefaults: null, people: {}, updateCheck: true, readFrom: 'listed', setupDone: false, lastCheck: 0, lastOk: 0, notifiedVersion: '' };
+  const SETTINGS_DEFAULT = { rules: DEFAULT_RULES, pillEnabled: true, pillMode: 'always', pillYFrac: 0.42, pillSide: 'r', pillMonitor: -1, autoFormat: false, linkBack: false, crossLinks: true, tabIcons: false, theme: 'sol-light', size: 'm', shortcuts: null, pillDests: null, atlassianSite: '', seenDefaults: null, people: {}, updateCheck: true, readFrom: 'any', setupDone: false, lastCheck: 0, lastOk: 0, notifiedVersion: '' };
   let settings = Object.assign({}, SETTINGS_DEFAULT);
 
   let currentRule = null;
@@ -121,7 +121,7 @@ function createCore(io) {
     settings.lastCheck = Number.isFinite(settings.lastCheck) ? settings.lastCheck : 0;
     settings.lastOk = Number.isFinite(settings.lastOk) ? settings.lastOk : 0;
     settings.notifiedVersion = typeof settings.notifiedVersion === 'string' ? settings.notifiedVersion : '';
-    settings.readFrom = settings.readFrom === 'any' ? 'any' : 'listed';
+    settings.readFrom = settings.readFrom === 'listed' ? 'listed' : 'any';
     settings.setupDone = settings.setupDone === true;
     settings.autoFormat = settings.autoFormat === true;
     settings.linkBack = settings.linkBack === true;
@@ -141,9 +141,18 @@ function createCore(io) {
 
 
   // ---------------------------------------------------------------- privacy
-  // Morph reads the clipboard only for a copy made in an app you listed (or in any app, if you chose that),
-  // and only once setup has been answered. Reads you ask for with a click are always fine.
-  const readsEverything = () => settings.setupDone && settings.readFrom === 'any';
+  // One list, two ways (Settings → Apps): "All apps" reads copies from any app except password managers and converts
+  // for every supported tool; "Only these apps" reads and converts only in the apps switched on. Reads you ask for
+  // with a click are always fine.
+  const SETUP_APP_IDS = ['slack', 'jira', 'confluence', 'outlook', 'gdocs', 'notion', 'linear', 'teams', 'github', 'terminal'];
+  const setupApps = () => SETUP_APP_IDS.map((id) => settings.rules.find((r) => r.id === id)).filter(Boolean);
+  const allApps = () => settings.readFrom !== 'listed';
+  const readsEverything = () => allApps();
+  // In "All apps", every supported tool counts as one of your apps, whatever its switch says.
+  const activeRules = () => (allApps() ? settings.rules.map((r) => (SETUP_APP_IDS.includes(r.id) ? Object.assign({}, r, { enabled: true }) : r)) : settings.rules);
+  // The formats the pill offers: all of them, or only those of the apps switched on.
+  const offeredDests = () => (allApps() ? ALL_DESTS.slice() : ALL_DESTS.filter((d) => setupApps().some((r) => r.enabled && r.dest === d)));
+  const logoOf = (r) => (r.id === 'github' || r.id === 'terminal' ? r.id : r.dest);
   const appLabel = (w) => (currentRule && currentRule.name) || (w && w.app ? String(w.app).replace(/\.desktop$/, '').slice(0, 30) : 'another app');
   function note(kind, app, chars) {
     readLog.push({ at: io.now(), kind, app: String(app || '').slice(0, 30), chars: chars || 0 });
@@ -151,7 +160,6 @@ function createCore(io) {
   }
   // Called for every "something was copied" signal, before anything is read. true: go ahead and read.
   function mayRead() {
-    if (!settings.setupDone) { return false; }
     const pm = !!winNow && PASSWORD_APPS.test(String(winNow.app || '') + ' ' + String(winNow.title || ''));
     if (!pm && (settings.readFrom === 'any' || currentRule)) return true;
     lastSkip = { app: appLabel(winNow), pm };
@@ -208,7 +216,7 @@ function createCore(io) {
   // ---------------------------------------------------------------- pill spec
   const pillShouldShow = () => {
     if (!settings.pillEnabled) return false;
-    if (settings.pillMode === 'always') return true;
+    if (allApps()) return true;
     if (shellStatus === 'unavailable') return true;
     return !!currentRule;
   };
@@ -230,12 +238,13 @@ function createCore(io) {
   }
 
   function settingsSpec(base, page) {
-    const offered = settings.pillDests || ALL_DESTS;
+    const offered = offeredDests();
     const nav = [
       { id: 'settings', label: 'General', icon: 'tune' },
       { id: 'edit', label: 'Apps', icon: 'grid_view' },
       { id: 'keys', label: 'Shortcuts', icon: 'keyboard' },
       { id: 'privacy', label: 'Privacy', icon: 'lock' },
+      ...(shellVersion >= 15 ? [{ id: 'ocr', label: 'Image tables', icon: 'image' }] : []),
       { id: 'size', label: 'Size', icon: 'aspect_ratio' },
       ...(shellVersion >= 12 ? [{ id: 'updates', label: 'Updates', icon: 'refresh' }, { id: 'uninstall', label: 'Uninstall', icon: 'delete' }] : []),
       { id: 'about', label: 'About', icon: 'info' },
@@ -248,11 +257,13 @@ function createCore(io) {
     });
     const sw = (on) => (on ? 'on' : 'off');
     if (cur === 'edit') {
-      const hidden = ALL_DESTS.filter((d) => !offered.includes(d));
-      spec.pane = { title: 'Apps', lede: 'Drag to reorder. Switch apps on or off.',
-        apps: offered.map((d, i) => ({ label: OPTION_LABEL[d], dest: d, sw: 'on', action: 'dest:' + d,
-          up: i > 0 ? 'dmove:' + i + 'u' : '', down: i < offered.length - 1 ? 'dmove:' + i + 'd' : '' }))
-          .concat(hidden.map((d) => ({ label: OPTION_LABEL[d], dest: d, sw: 'off', action: 'dest:' + d, up: '', down: '' }))) };
+      const on = allApps();
+      spec.pane = { title: 'Apps', lede: on ? APP_NAME + ' reads copies from any app, except password managers, and converts for all of these.' : APP_NAME + ' reads copies only from the apps switched on below, and converts only for them.',
+        opts: [{ icon: 'grid_view', label: 'All apps', sub: on ? 'On: every app, except password managers' : 'Off: only the apps switched on below', sw: sw(on), action: 'toggle:readfrom' }] };
+      if (on) spec.pane.blocks = [{ kind: 'panel', tone: 'plain', title: 'Converts for', items: [setupApps().map((r) => r.name).join(', ')] }];
+      else spec.pane.apps = setupApps().map((r) => ({ label: r.name, dest: logoOf(r), sw: r.enabled ? 'on' : 'off', action: 'rule:' + r.id, up: '', down: '' }));
+      spec.pane.appsFixed = true;
+      spec.pane.offLabel = 'Off';
     } else if (cur === 'keys') {
       const KEY_SHORT = { paste: 'Paste, fixed', plain: 'Paste as plain text', pill: 'Open the pill', auto: 'Auto-format on/off', pdf: 'Save as PDF' };
       const KEY_ICON = { paste: 'content_paste', plain: 'notes', pill: 'grid_view', auto: 'bolt', pdf: 'description' };
@@ -260,10 +271,13 @@ function createCore(io) {
         keys: shortcutsForSettings().map((k, i) => ({ label: KEY_SHORT[k.id] || k.name, icon: KEY_ICON[k.id] || 'keyboard', keys: k.label.split(' ').filter(Boolean).slice(0, 5), sw: sw(k.on && !k.taken), note: k.taken ? 'Taken by another app' : '', action: 'key:' + i })) };
     } else if (cur === 'privacy') {
       const recent = readLog.slice(-8).reverse().map(readLine);
-      spec.pane = { title: 'Privacy', lede: 'Morph never stores or sends what you copy.',
-        opts: [{ icon: 'lock', label: 'Read copies from all apps', sub: settings.readFrom === 'any' ? 'On: any app except password managers. Nothing is stored or sent' : 'Off: only copies from your apps are read. Others wait for a click', sw: sw(settings.readFrom === 'any'), action: 'toggle:readfrom' }] };
-      if (shellVersion >= 13) spec.pane.blocks = [{ kind: 'panel', tone: 'plain', title: 'What Morph read', items: recent.length ? recent : ['Nothing yet. Copies show up here, without their content.'] },
-        ...ocrBlocks()];
+      spec.pane = { title: 'Privacy', lede: APP_NAME + ' never stores or sends what you copy.',
+        actions: [{ icon: 'grid_view', label: 'Which apps ' + APP_NAME + ' reads from', sub: allApps() ? 'All apps, except password managers. Change it in Apps' : setupApps().filter((r) => r.enabled).length + ' apps. Change them in Apps', action: 'view:edit' }] };
+      if (shellVersion >= 13) spec.pane.blocks = [
+        { kind: 'panel', tone: 'plain', title: 'What ' + APP_NAME + ' read', items: recent.length ? recent : ['Nothing yet. Copies show up here, without their content.'] },
+        { kind: 'panel', tone: 'plain', title: 'Never read', items: ['Password managers', 'Copies an app marks as secret'] }];
+    } else if (cur === 'ocr') {
+      spec.pane = { title: 'Image tables', lede: 'Read a table from a copied screenshot, on this computer.', blocks: ocrBlocks() };
     } else if (cur === 'size') {
       const SUB = { s: 'Compact', m: 'Default', l: 'Roomy' };
       spec.pane = { title: 'Size', lede: 'Pick the size that fits how you work.',
@@ -324,7 +338,6 @@ function createCore(io) {
           { icon: 'link', label: 'Keep the source link', sub: 'Add a link back to where it came from', sw: sw(settings.linkBack), action: 'toggle:link' },
           { icon: 'public', label: 'Show links in copies', sub: 'URLs, tickets and emails you can click to open', sw: sw(settings.crossLinks), action: 'toggle:crosslinks' },
           { icon: 'grid_view', label: 'App icons on the tab', sub: 'Convert with one click, without opening it', sw: sw(settings.tabIcons), action: 'toggle:tabicons' },
-          { icon: 'public', label: 'Show the pill in every app', sub: 'Off: only in the apps you chose', sw: sw(settings.pillMode === 'always'), action: 'toggle:mode' },
         ] };
       if (shellVersion < 12) {
         // An older helper only draws switches: keep the old two-click rows until it is updated.
@@ -344,7 +357,7 @@ function createCore(io) {
     const copy = copySummary();
     const now = io.now();
     const tickDest = tick && now < tick.until ? tick.dest : null;
-    const offered = settings.pillDests || ALL_DESTS;
+    const offered = offeredDests();
     const others = offered.filter((d) => !rule || d !== rule.dest);
     const rows = [];
     const skipped = !copy && /^Not read/.test(clipStatus) && !!lastSkip;
@@ -379,7 +392,7 @@ function createCore(io) {
       view: 'main',
       gear: 'view:settings',
       source: copy ? { icon: /table/i.test(copy.what || '') ? 'table' : 'content_paste', dest: place ? place.dest : '', title: 'Copied from ' + (place ? place.tool : copy.from), sub: [place ? place.where : '', copy.what].filter(Boolean).join(' · ') }
-        : skipped ? { icon: 'lock', title: lastSkip.pm ? 'Password manager: skipped' : 'Skipped on purpose', sub: lastSkip.pm ? 'Morph never reads copies from password managers.' : 'Copied from ' + lastSkip.app + ', which is not one of your apps, so Morph did not read it. Pick an app below to convert it, or turn on "Read copies from all apps" in Settings, Privacy.' }
+        : skipped ? { icon: 'lock', title: lastSkip.pm ? 'Password manager: skipped' : 'Skipped on purpose', sub: lastSkip.pm ? 'Morph never reads copies from password managers.' : 'Copied from ' + lastSkip.app + ', which is not one of your apps, so Morph did not read it. Pick an app below to convert it, or turn on "All apps" in Settings, Apps.' }
         : imageOnly ? { icon: 'image', title: 'Image copied', sub: 'Nothing to convert. Paste it as it is.' }
         : { icon: 'content_paste', title: 'Nothing copied yet', sub: 'Copy something to start' },
       links: [],
@@ -422,22 +435,14 @@ function createCore(io) {
   }
   function sendPill() {
     const spec = shellSpec();
-    if (!settings.setupDone && shellVersion >= 14) {
-      // First run: one centered page, before the pill shows. Nothing is read until it is answered.
+    if (!settings.setupDone && shellVersion >= 23) {
+      // Once, after install: a short welcome card says what Morph does and where to change it. No questions.
       spec.visible = false;
-      spec.setup = { title: 'Set up ' + APP_NAME, lede: APP_NAME + ' re-shapes what you copy for the app you paste into. Your clipboard stays on your device. ' + APP_NAME + ' never uploads or stores copied content.',
-        appsLabel: 'Choose your apps', apps: setupApps().map((r) => ({ name: r.name, on: r.enabled, dest: r.dest, logo: r.id === 'github' || r.id === 'terminal' ? r.id : r.dest })),
-        appsNote: APP_NAME + ' reads and formats only in these apps.',
-        fmtNote: shellVersion >= 22 ? 'Formats are supported for ' + setupApps().map((r) => r.name).join(', ') + ' for now. In other apps you can still pick a format from the pill.' : '',
-        opts: shellVersion >= 22 ? [
-          { id: 'all', title: 'Where should ' + APP_NAME + ' work?', sel: 0, choices: [
-            { label: 'All apps', sub: 'Reads your copies from any app, except password managers, and formats them for the tools below. Nothing is stored or sent.', bit: '1' },
-            { label: 'Only the apps I choose', sub: 'Reads and formats only in the apps you tick.', bit: '0' }] },
-          { id: 'auto', title: 'Convert', sel: 0, choices: [
-            { label: 'When I pick an app in the pill', sub: '', bit: '0' },
-            { label: 'Automatically when I switch to one of these apps', sub: 'This rewrites your clipboard.', bit: '1' }] }] : [],
-        updLabel: 'Check for updates daily', updSub: 'Automatically checks whether a newer version is available.', updOn: settings.updateCheck,
-        none: 'Select at least one app to continue.', start: 'Start ' + APP_NAME };
+      spec.setup = { welcome: true, title: APP_NAME + ' is ready',
+        body: [allApps() ? APP_NAME + ' reads what you copy in any app, except password managers, and converts it for these tools:' : APP_NAME + ' reads what you copy in these apps and converts it for them:'],
+        apps: (allApps() ? setupApps() : setupApps().filter((r) => r.enabled)).map((r) => ({ name: r.name, logo: logoOf(r) })),
+        foot: 'What you copy never leaves this computer. To choose which apps ' + APP_NAME + ' reads from, open Settings → Apps. ' + APP_NAME + ' checks for updates once a day; you can turn that off in Settings → Updates.',
+        ok: 'Got it', settings: 'Open Settings' };
     }
     flash = null;
     try { io.shell.setPill(spec); } catch (e) { log('setPill failed:', e && e.message); }
@@ -632,7 +637,7 @@ function createCore(io) {
     shellStatus = 'ok';
     if (win && isSelf(win)) return;
     winNow = win && (win.app || win.title) ? { app: win.app || '', title: win.title || '' } : null;
-    currentRule = winNow ? matchRule(settings.rules, winNow) : null;
+    currentRule = winNow ? matchRule(activeRules(), winNow) : null;
     ensureShortcuts();
     sendPill();
     maybeAutoFormat();
@@ -721,7 +726,18 @@ function createCore(io) {
     if (kind === 'toggle' && arg === 'crosslinks') { settings.crossLinks = !settings.crossLinks; if (!settings.crossLinks) crossLinks = []; }
     if (kind === 'toggle' && arg === 'tabicons') settings.tabIcons = !settings.tabIcons;
     if (kind === 'toggle' && arg === 'updates') { settings.updateCheck = !settings.updateCheck; save(); sendPill(); if (settings.updateCheck) checkUpdates(true); return; }
-    if (kind === 'toggle' && arg === 'readfrom') { settings.readFrom = settings.readFrom === 'any' ? 'listed' : 'any'; save(); sendPill(); return; }
+    if (kind === 'toggle' && arg === 'readfrom') {
+      settings.readFrom = allApps() ? 'listed' : 'any';
+      if (!allApps() && !setupApps().some((r) => r.enabled)) setupApps().forEach((r) => { r.enabled = !['github', 'terminal'].includes(r.id); });
+      save(); if (winNow) focus(winNow, shellVersion); else sendPill(); return;
+    }
+    if (kind === 'rule' && SETUP_APP_IDS.includes(arg)) {
+      const r = setupApps().find((x) => x.id === arg);
+      // At least one app stays on: with none, "Only these apps" would mean Morph does nothing.
+      if (r && (!r.enabled || setupApps().filter((x) => x.enabled).length > 1)) { r.enabled = !r.enabled; save(); }
+      if (winNow) focus(winNow, shellVersion); else sendPill();
+      return;
+    }
     if (kind === 'toggle' && arg === 'mode') { settings.pillMode = settings.pillMode === 'always' ? 'apps' : 'always'; save(); sendPill(); return; }
     if (kind === 'dest' && ALL_DESTS.includes(arg)) {
       const set = new Set(settings.pillDests || ALL_DESTS);
@@ -733,35 +749,16 @@ function createCore(io) {
   }
   // The apps the first-run page offers, in the order it shows them. Same rules as the Apps page, so one list
   // decides both where Morph reads copies and where the pill (and so pasting) works.
-  const SETUP_APP_IDS = ['slack', 'jira', 'confluence', 'outlook', 'gdocs', 'notion', 'linear', 'teams', 'github', 'terminal'];
-  const setupApps = () => SETUP_APP_IDS.map((id) => settings.rules.find((r) => r.id === id)).filter(Boolean);
-  // arg: one char for "check for updates" (0/1), then one char per app in setupApps() order (0/1).
-  function welcome() {
-    if (settings.welcomed || !settings.setupDone) return;
+  // The welcome card was answered: "ok" (Got it, ✕ or Esc) or "settings" (open Settings → Apps).
+  function finishWelcome(arg) {
+    if (settings.setupDone) return;
+    settings.setupDone = true;
     settings.welcomed = true;
     save();
-    io.notify(APP_NAME + ' is running', 'Look for the small tab on the edge of the screen. Copy something, then click it.');
-  }
-  function finishSetup(arg) {
-    if (settings.setupDone) return;
-    const apps = setupApps();
-    // update bit, one bit per app, then (from helper 17) "read from all apps" and "auto format".
-    const n = apps.length + 1;
-    if ((arg.length !== n && arg.length !== n + 2) || !/^[01]+$/.test(arg)) return;
-    const picks = arg.slice(1, n);
-    if (!picks.includes('1')) { sendPill(); return; } // at least one app, always
-    apps.forEach((r, i) => { r.enabled = picks[i] === '1'; });
-    settings.readFrom = arg.length === n + 2 && arg[n] === '1' ? 'any' : 'listed';
-    settings.autoFormat = arg.length === n + 2 && arg[n + 1] === '1';
-    settings.updateCheck = arg[0] === '1';
-    settings.setupDone = true;
-    save();
-    log('setup done:', apps.filter((r) => r.enabled).length + ' apps', settings.readFrom === 'any' ? 'all apps' : 'listed apps only', settings.autoFormat ? 'auto format on' : 'auto format off', settings.updateCheck ? 'updates on' : 'updates off');
-    welcome();
-    if (winNow) focus(winNow, shellVersion); // the app in front may have just been ticked
+    log('welcome card closed:', arg);
+    if (arg === 'settings') { pillView = 'edit'; flash = { sub: '', tone: 'ok', open: true }; }
+    if (winNow) focus(winNow, shellVersion);
     else sendPill();
-    if (readsEverything()) refreshClip();
-    io.setTimeout(() => { checkUpdates(false); }, 20000);
   }
   function action(a) {
     if (typeof a !== 'string' || !/^[a-z]+:[a-z0-9]*$/.test(a)) return;
@@ -776,11 +773,11 @@ function createCore(io) {
     if (kind === 'openpdf' && lastPdf) io.openPath(lastPdf);
     if (kind === 'showpdf' && lastPdf) io.showInFolder(lastPdf);
     if (kind === 'openlink') { const idx = parseInt(arg, 10); if (crossLinks[idx] && crossLinks[idx].url) io.openUri(crossLinks[idx].url); }
-    if (['view', 'theme', 'toggle', 'dest', 'size', 'dswap', 'dhide', 'dadd', 'dmove', 'dput'].includes(kind)) onSettingsAction(kind, arg);
+    if (['view', 'theme', 'toggle', 'dest', 'size', 'dswap', 'dhide', 'dadd', 'dmove', 'dput', 'rule'].includes(kind)) onSettingsAction(kind, arg);
     if (kind === 'key' && /^[a-z]+$/.test(arg)) onShortcut(arg);
     if (kind === 'key' && /^\d{1,2}$/.test(arg)) onSettingsAction('key', arg);
     if (kind === 'refresh') refreshClip();
-    if (kind === 'setup' && /^[01]{2,16}$/.test(arg)) finishSetup(arg);
+    if (kind === 'setup' && /^(ok|settings)$/.test(arg)) finishWelcome(arg);
     if (kind === 'ocr' && /^(on|off|cancel)$/.test(arg)) ocrAction(arg);
     if (kind === 'update') runUpdate();
     if (kind === 'checkupdate') checkNow();
@@ -898,9 +895,8 @@ function createCore(io) {
   async function start() {
     load();
     sendPill();
-    welcome(); // only once the first-run page has been answered, so it never sits on top of it
     if (readsEverything()) await refreshClip(); // whatever is on the clipboard already (only if you chose to read every app)
-    io.setTimeout(() => { if (settings.setupDone) checkUpdates(false); }, 20000);
+    io.setTimeout(() => { checkUpdates(false); }, 20000);
     scheduleUpdateChecks();
   }
 

@@ -62,7 +62,7 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
   const fx = fixture('ai-markdown-reply');
   // --- start, focus, a new copy
   {
-    const d = desk({ saved: JSON.stringify({ pillMode: 'apps' }) });
+    const d = desk({ saved: JSON.stringify({ readFrom: 'listed' }) });
     const c = createCore(d.io);
     await c.start();
     check('starts hidden when no chosen app is in front', d.last().visible === false);
@@ -239,16 +239,16 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
     const c = createCore(d.io);
     await c.start();
     c.focus({ app: 'gnome-terminal-server', title: 'Terminal' }, 11);
-    check('a new install shows the pill in every app', d.last().visible === true && c.settings.pillMode === 'always');
+    check('a new install shows the pill in every app', d.last().visible === true && c.settings.readFrom === 'any');
   }
   // --- first run says hello once
   {
     const d = desk();
     const c0 = createCore(d.io);
     await c0.start();
-    check('no hello on top of the first-run page', d.notes.length === 0);
-    c0.action('setup:11111111100');
-    check('first start says hello once, after setup', d.notes.length === 1 && /is running/.test(d.notes[0].title));
+    check('no hello notification: the welcome card says it', d.notes.length === 0);
+    c0.action('setup:ok');
+    check('…not after the card either', d.notes.length === 0);
     const d2 = desk({ saved: d.saved });
     await createCore(d2.io).start();
     check('...and not again', d2.notes.length === 0);

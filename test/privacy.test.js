@@ -1,4 +1,5 @@
-// Privacy: nothing is read until setup is answered; in "only my apps" mode a copy from another app is never read.
+// Privacy and the one app list: "All apps" reads any app except password managers; "Only these apps" reads and
+// converts only in the apps switched on. A one-time welcome card says so; it asks no questions.
 const fs = require('fs');
 const path = require('path');
 global.window = global;
@@ -20,94 +21,98 @@ function desk(saved) {
 }
 (async () => {
   {
+    // A fresh install with a current helper: the welcome card, pill hidden behind it, and all apps by default.
+    const d = desk(); const c = createCore(d.io);
+    await c.start();
+    check('fresh install reads from all apps (the current copy is read at start)', d.reads === 1 && c.readsEverything() === true);
+    c.focus({ app: 'slack', title: 'x - Slack' }, 23);
+    const w = d.last().setup;
+    check('welcome card: no questions, says what Morph does', w && w.welcome === true && w.title === 'Morph is ready' && /any app, except password managers/.test(w.body[0]) && !w.opts && !w.start);
+    check('welcome card lists the ten tools with their logos', w.apps.length === 10 && w.apps.find((a) => a.name === 'Slack').logo === 'slack' && w.apps.find((a) => a.name === 'GitHub').logo === 'github' && w.apps.find((a) => a.name === 'Terminal').logo === 'terminal');
+    check('welcome card says where to change it, and mentions the update check', /Settings → Apps/.test(w.foot) && /checks for updates once a day/.test(w.foot) && /never leaves this computer/.test(w.foot));
+    check('the pill waits behind the welcome card', d.last().visible === false);
+    check('copies are read from any app', c.mayRead() === true);
+    c.focus({ app: 'gnome-terminal-server', title: 'bash' }, 23);
+    check('…including apps that are not one of the ten', c.mayRead() === true);
+    c.focus({ app: '1password', title: '1Password' }, 23);
+    check('password managers are never read', c.mayRead() === false && /Password manager/.test(d.last().source.title));
+    c.focus({ app: 'org.keepassxc.KeePassXC', title: 'Passwords - KeePassXC' }, 23);
+    check('KeePassXC is skipped too', c.mayRead() === false);
+    c.focus({ app: 'slack', title: 'x - Slack' }, 23);
+    c.action('setup:ok');
+    check('Got it: the card is gone and the pill shows', !d.last().setup && d.last().visible !== false && JSON.parse(d.saved).setupDone === true);
+    c.action('setup:settings');
+    check('the card cannot be answered twice', !d.last().setup);
+  }
+  {
+    const d = desk(); const c = createCore(d.io);
+    await c.start();
+    c.focus({ app: 'slack', title: 'x - Slack' }, 23);
+    c.action('setup:settings');
+    check('Open Settings: the pill opens on the Apps page', d.last().openNow === true && d.last().pane && d.last().pane.title === 'Apps');
+  }
+  {
     const d = desk(); const c = createCore(d.io);
     await c.start();
     c.focus({ app: 'slack', title: 'x - Slack' }, 14);
-    check('before setup: no read at start', d.reads === 0);
-    check('before setup: a copy is not read', c.mayRead() === false && d.reads === 0);
-    check('before setup: the helper is asked for the setup page, pill hidden', !!d.last().setup && d.last().visible === false);
-    const sp = d.last().setup;
-    check('setup offers the ten apps with the usual defaults', sp.apps.length === 10 && sp.apps.filter((a) => a.on).length === 8 && !sp.apps.find((a) => a.name === 'Terminal').on && !sp.apps.find((a) => a.name === 'GitHub').on);
-    check('each app carries its logo name', sp.apps.every((a) => typeof a.dest === 'string' && a.dest) && sp.apps.find((a) => a.name === 'Slack').dest === 'slack' && sp.apps.find((a) => a.name === 'Jira').dest === 'jira');
-    check('setup wording', /Your clipboard stays on your device/.test(sp.lede) && sp.appsLabel === 'Choose your apps' && /reads and formats only in these apps\.$/.test(sp.appsNote) && sp.updSub === 'Automatically checks whether a newer version is available.' && sp.none === 'Select at least one app to continue.');
-    c.action('setup:00000000000');
-    check('no app ticked: setup does not finish', JSON.parse(d.saved || '{}').setupDone !== true && !!d.last().setup);
-    c.action('setup:0');
-    check('a malformed answer is ignored', JSON.parse(d.saved || '{}').setupDone !== true);
+    check('an older helper gets no card and shows the pill', !d.last().setup && d.last().visible !== false);
     c.action('setup:01111111100');
-    check('setup saved: only my apps, updates off', JSON.parse(d.saved).readFrom === 'listed' && JSON.parse(d.saved).setupDone === true && JSON.parse(d.saved).updateCheck === false);
-    const rules = JSON.parse(d.saved).rules;
-    check('the ticked apps are the enabled rules', rules.find((r) => r.id === 'slack').enabled && !rules.find((r) => r.id === 'terminal').enabled);
-    check('after setup the page is gone', !d.last().setup);
-    check('listed app: copy may be read', c.mayRead() === true);
-    c.focus({ app: 'gnome-terminal-server', title: 'bash' }, 14);
-    check('unlisted app: copy is not read', c.mayRead() === false && d.reads === 0);
-    check('the pill says it was not read', /Not read: copied from/.test(c.state.clipStatus));
-    {
-      const sp2 = d.last();
-      check('skipped copy: the pill says it was skipped on purpose, not "Copied from Not read"', sp2.source.title === 'Skipped on purpose' && /Copied from .*not one of your apps/.test(sp2.source.sub) && /Read copies from all apps/.test(sp2.source.sub) && !/Copied from Not read/.test(JSON.stringify(sp2.source)));
-      check('skipped copy: apps can still be picked (a click is you asking)', (sp2.options || []).concat(sp2.tab || []).some((o) => o.action && /^fix:/.test(o.action)) || JSON.stringify(sp2).includes('"action":"fix:'));
-    }
-    c.action('view:settings'); c.action('view:privacy');
-    const items = JSON.stringify(d.last().pane.blocks || []);
-    check('read log shows the skip, without content', /Skipped a copy from/.test(items) && !/hello/.test(items));
+    check('an old-style setup answer is ignored', JSON.parse(d.saved || '{}').setupDone !== true);
+  }
+  {
+    // Settings → Apps: one list, two ways.
+    const d = desk(JSON.stringify({ setupDone: true })); const c = createCore(d.io);
+    await c.start();
+    c.focus({ app: 'slack', title: 'x - Slack' }, 23);
+    c.action('view:edit');
+    let pane = d.last().pane;
+    check('Apps page: "All apps" is on by default, and lists what it converts for', pane.opts[0].label === 'All apps' && pane.opts[0].sw === 'on' && /Slack.*Terminal/.test(JSON.stringify(pane.blocks)) && !pane.apps);
+    c.action('view:main');
+    check('All apps: the pill offers every other format (Slack is the app in front)', ['jira', 'email', 'markdown', 'text', 'notion'].every((x) => JSON.stringify(d.last().options).includes('"dest":"' + x + '"')));
+    c.action('view:edit');
     c.action('toggle:readfrom');
-    check('switching to any app is saved', JSON.parse(d.saved).readFrom === 'any' && c.readsEverything() === true);
-    check('any app: a copy may be read', c.mayRead() === true);
-    c.focus({ app: '1password', title: '1Password' }, 14);
-    check('all apps still skips password managers', c.mayRead() === false && /Password manager/.test(d.last().source.title));
-    c.focus({ app: 'org.keepassxc.KeePassXC', title: 'Passwords - KeePassXC' }, 14);
-    check('KeePassXC is skipped too', c.mayRead() === false);
-    c.focus({ app: 'gnome-terminal-server', title: 'bash' }, 14);
-    check('other apps are read again', c.mayRead() === true);
+    pane = d.last().pane;
+    check('Only these apps: the ten apps with switches, the usual eight on', JSON.parse(d.saved).readFrom === 'listed' && pane.apps.length === 10 && pane.apps.filter((a) => a.sw === 'on').length === 8 && pane.apps.every((a) => /^rule:/.test(a.action)) && pane.appsFixed === true);
+    check('the switches change the same list that decides reading', c.mayRead() === true);
+    c.action('view:main');
+    c.focus({ app: 'gnome-terminal-server', title: 'bash' }, 23);
+    check('Only these apps: a copy from another app is not read', c.mayRead() === false && d.reads === 1);
+    const sp = d.last();
+    check('skipped copy: says why and how to change it', sp.source.title === 'Skipped on purpose' && /not one of your apps/.test(sp.source.sub) && /"All apps" in Settings, Apps/.test(sp.source.sub));
+    check('skipped copy: an app can still be picked (a click is you asking)', JSON.stringify(sp).includes('"action":"fix:'));
+    c.action('rule:terminal');
+    check('switching Terminal on makes terminal copies readable', c.mayRead() === true);
+    c.focus({ app: 'slack', title: 'x - Slack' }, 23);
+    c.action('rule:slack');
+    check('switching Slack off stops reading from Slack', c.mayRead() === false);
+    c.action('view:main');
+    check('…and the pill no longer offers Slack', !JSON.stringify(d.last().options || []).includes('"fix:slack"'));
+    ['jira', 'confluence', 'outlook', 'gdocs', 'notion', 'linear', 'teams', 'github', 'terminal'].forEach((id) => c.action('rule:' + id));
+    const left = JSON.parse(d.saved).rules.filter((r) => ['slack', 'jira', 'confluence', 'outlook', 'gdocs', 'notion', 'linear', 'teams', 'github', 'terminal'].includes(r.id) && r.enabled);
+    check('the last app cannot be switched off', left.length === 1);
+    c.action('toggle:readfrom');
+    check('back to All apps reads everywhere again', JSON.parse(d.saved).readFrom === 'any' && c.mayRead() === true);
   }
   {
-    const d = desk(); const c = createCore(d.io);
+    // Privacy page: the read log and what is never read. Which apps lives on the Apps page only.
+    const d = desk(JSON.stringify({ setupDone: true, readFrom: 'listed' })); const c = createCore(d.io);
     await c.start();
-    c.focus({ app: 'gnome-terminal-server', title: 'bash' }, 14);
-    c.action('setup:11111111111');
-    check('ticking Terminal in setup makes terminal copies readable', c.mayRead() === true);
-  }
-  {
-    const d = desk(JSON.stringify({ setupDone: true, readFrom: 'any' })); const c = createCore(d.io);
-    await c.start();
-    check('any app mode reads at start', d.reads === 1);
+    c.focus({ app: 'gnome-terminal-server', title: 'bash' }, 23);
+    c.mayRead();
+    c.action('view:privacy');
+    const pane = d.last().pane;
+    const items = JSON.stringify(pane.blocks || []);
+    check('Privacy: read log shows the skip, without content', /Skipped a copy from/.test(items) && !/hello/.test(items));
+    check('Privacy: lists what is never read', /Never read/.test(items) && /Password managers/.test(items));
+    check('Privacy: no switch of its own; it points to Apps', !pane.opts && pane.actions[0].action === 'view:edit');
+    check('table OCR has its own page, not Privacy', !/table OCR/i.test(items) && d.last().nav.some((n) => n.action === 'view:ocr'));
+    c.action('view:ocr');
+    check('Image tables page shows the OCR controls', d.last().pane.title === 'Image tables' && /Enable table OCR|Table OCR/.test(JSON.stringify(d.last().pane.blocks)));
   }
   {
     const d = desk(JSON.stringify({ setupDone: true, readFrom: 'listed' })); const c = createCore(d.io);
     await c.start();
-    check('only-my-apps mode never reads at start', d.reads === 0);
-    c.action('setup:11111111111');
-    check('setup cannot be redone by a stray action', JSON.parse(d.saved).readFrom === 'listed');
-  }
-  {
-    // The two new switches in the first-run page (helper 17): all apps on by default, auto format off.
-    const d = desk(); const c = createCore(d.io);
-    await c.start();
-    c.focus({ app: 'slack', title: 'x - Slack' }, 22);
-    const so = d.last().setup.opts || [];
-    const pick = (g) => g && g.choices[g.sel];
-    check('setup: "Where should Morph work?" defaults to All apps (any app, except password managers)', so[0] && so[0].id === 'all' && /Where should Morph work/.test(so[0].title) && pick(so[0]).bit === '1' && pick(so[0]).label === 'All apps' && /except password managers/.test(pick(so[0]).sub) && so[0].choices[1].bit === '0' && /Only the apps I choose/.test(so[0].choices[1].label));
-    check('setup warns that formats cover only some tools for now', /Formats are supported for Slack.*Terminal for now/.test(d.last().setup.fmtNote) && /pick a format from the pill/.test(d.last().setup.fmtNote));
-    check('setup: "Convert" defaults to picking in the pill; automatic says it rewrites the clipboard', so[1] && so[1].id === 'auto' && so[1].title === 'Convert' && pick(so[1]).bit === '0' && /pick an app in the pill/.test(pick(so[1]).label) && so[1].choices[1].bit === '1' && /rewrites your clipboard/.test(so[1].choices[1].sub));
-    check('GitHub and Terminal tiles have their own icons', d.last().setup.apps.some((a) => a.name === 'GitHub' && a.logo === 'github') && d.last().setup.apps.some((a) => a.name === 'Terminal' && a.logo === 'terminal'));
-    c.action('setup:1111111111' + '1' + '1' + '0');
-    check('answer with defaults: reads from all apps, auto format off', JSON.parse(d.saved).readFrom === 'any' && JSON.parse(d.saved).autoFormat === false && c.readsEverything() === true);
-  }
-  {
-    const d = desk(); const c = createCore(d.io);
-    await c.start();
-    c.focus({ app: 'slack', title: 'x - Slack' }, 22);
-    c.action('setup:1' + '1111111100' + '01');
-    check('all apps off, auto format on are both honoured', JSON.parse(d.saved).readFrom === 'listed' && JSON.parse(d.saved).autoFormat === true);
-  }
-  {
-    const d = desk(); const c = createCore(d.io);
-    await c.start();
-    c.focus({ app: 'slack', title: 'x - Slack' }, 14);
-    check('an older helper is not shown switches it cannot draw', (d.last().setup.opts || []).length === 0);
-    c.action('setup:01111111100');
-    check('an older helper answer keeps reading to the listed apps', JSON.parse(d.saved).readFrom === 'listed' && JSON.parse(d.saved).autoFormat === false);
+    check('only-these-apps mode never reads at start', d.reads === 0);
   }
   console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed (privacy)');
   process.exit(failed ? 1 : 0);

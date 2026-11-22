@@ -7,7 +7,7 @@
 #   morph --restart     stop, then start
 #   morph --update      fetch the newest version from the website and install it
 #   morph --status      is it running, is the GNOME helper installed
-#   morph --setup       show the first-run setup page again
+#   morph --setup       show the welcome card again
 #   morph --enable-ocr  optional: read tables from copied images (installs PaddleOCR for this account, ~1 GB)
 #   morph --disable-ocr remove that again
 #   morph --uninstall   remove everything: the program, helper, settings, logs, caches and this folder
@@ -101,7 +101,7 @@ do_install() {
   retire_old
 
   # A first install has no command, helper or autostart yet. Settings found then were left by an earlier
-  # uninstall, so they are stale: clear them, and the setup page shows as it should.
+  # uninstall, so they are stale: clear them, and the welcome card shows as it should.
   STALE_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/morph"
   if [ -f "$STALE_CFG/settings.json" ] && [ ! -d "$EXT_DEST" ] && [ ! -e "$BIN_DIR/morph" ] && [ ! -f "$AUTOSTART" ]; then
     rm -rf "$STALE_CFG"
@@ -313,13 +313,13 @@ do_status() {
   if [ -f "$OCR_DIR/ready" ]; then say "Table OCR: on"; else say "Table OCR: off (morph --enable-ocr to turn it on)"; fi
 }
 
-# Forget that setup was answered and start again: the setup page opens as it did on the first run.
+# Forget that setup was answered and start again: the welcome card opens as it did on the first run.
 do_setup() {
   f="${XDG_CONFIG_HOME:-$HOME/.config}/morph/settings.json"
   do_stop >/dev/null 2>&1 || true
   if [ -f "$f" ]; then sed -i 's/"setupDone": *true/"setupDone": false/' "$f"; fi
   do_start
-  say "The setup page opens now."
+  say "The welcome card opens now."
 }
 
 case "${1:-}" in

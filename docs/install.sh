@@ -26,4 +26,4 @@ chmod +x "$DEST/bin/morph"
 say "Morph $ver unpacked into $DEST"
 "$DEST/bin/morph" --install
 say ""
-say "Done. Morph opens a short setup page now. If you do not see it, run:  morph --status"
+say "Done. Morph shows a short welcome now. If you do not see it, run:  morph --status"
