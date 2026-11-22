@@ -261,7 +261,7 @@ function createCore(io) {
     return !!currentRule;
   };
   function copySummary() {
-    if (clipStatus === 'Nothing copied yet' || /^Nothing to convert/.test(clipStatus) || /^Not read/.test(clipStatus)) return null;
+    if (clipStatus === 'Nothing copied yet' || /^Nothing to convert/.test(clipStatus) || /^Not read/.test(clipStatus) || /^(Image copied|Reading the table)/.test(clipStatus)) return null;
     const t = clipStatus.replace(/^Last copy: /, '');
     const i = t.indexOf(', ');
     return i < 0 ? { from: t, what: '' } : { from: t.slice(0, i), what: t.slice(i + 2) };
@@ -405,7 +405,8 @@ function createCore(io) {
     const rows = [];
     const skipped = !copy && /^Not read/.test(clipStatus) && !!lastSkip;
     const idle = !copy && !skipped; // a skipped copy still lets you pick an app: that click is you asking Morph to read it
-    const imageOnly = idle && /image$/.test(clipStatus);
+    const imageOnly = idle && (/image$/.test(clipStatus) || /^Image copied/.test(clipStatus));
+    const ocrBusy = /^Reading the table/.test(clipStatus);
     for (let i = 0; i < others.length; i += 2) rows.push(others.slice(i, i + 2).map((d) => (tickDest === d
       ? { label: OPTION_LABEL[d], done: true }
       : idle ? { label: OPTION_LABEL[d], dest: d, off: true }
@@ -436,7 +437,8 @@ function createCore(io) {
       gear: 'view:settings',
       source: copy ? { icon: /table/i.test(copy.what || '') ? 'table' : 'content_paste', dest: place ? place.dest : '', title: 'Copied from ' + (place ? place.tool : copy.from), sub: [place ? place.where : '', copy.what].filter(Boolean).join(' · ') }
         : skipped ? { icon: 'lock', title: 'Copied from ' + lastSkip.app, sub: lastSkip.pm ? 'Never read: a password manager' : 'Not read: ' + lastSkip.app + ' is off in Settings → Apps' }
-        : imageOnly ? { icon: 'image', title: 'Image copied', sub: 'Nothing to convert. Paste it as it is.' }
+        : ocrBusy ? { icon: 'image', title: 'Reading the table…', sub: 'Up to a minute the first time' }
+        : imageOnly ? { icon: 'image', title: 'Image copied', sub: ocrNote || 'Nothing to convert. Paste it as it is.' }
         : { icon: 'content_paste', title: 'Nothing copied yet', sub: 'Copy something to start' },
       links: [],
       tab: settings.tabIcons ? others.slice(0, 4).map((d) => (tickDest === d
@@ -534,7 +536,9 @@ function createCore(io) {
   const ocrReady = () => !!(io.ocr && io.ocr.ready() && shellVersion >= 15);
   let ocrNote = '';      // why the last image read gave nothing
   let ocrFromImage = false; // the clip being converted was read from an image
+  let ocrSeq = -1, ocrSeqClip = null;   // the copy an image was last read for, and its table (null: it failed)
   async function readImageTable() {
+    if (ocrSeq === copySeq) return ocrSeqClip;
     ocrNote = '';
     if (!ocrReady()) return null;
     clipStatus = 'Reading the table…';
@@ -544,16 +548,18 @@ function createCore(io) {
     if (!r.ok || !/<table/i.test(r.html || '')) {
       ocrNote = r.error === 'no_table' ? 'No table found in that image.' : 'Couldn’t read that image.';
       clipStatus = 'Image copied: ' + ocrNote.toLowerCase();
+      ocrSeq = copySeq; ocrSeqClip = null;
       sendPill();
       return null;
     }
     const clip = { html: r.html, text: '', context: null };
     const run = FB.engine.run(clip, null);
-    if (!run.has) { ocrNote = 'No table found in that image.'; sendPill(); return null; }
+    if (!run.has) { ocrNote = 'No table found in that image.'; ocrSeq = copySeq; ocrSeqClip = null; sendPill(); return null; }
     original = clip;
     ocrFromImage = true;
     crossLinks = [];
     clipStatus = 'Table read from an image, ' + (FB.astStats(run.ast).summary || 'table');
+    ocrSeq = copySeq; ocrSeqClip = clip;
     sendPill();
     return clip;
   }

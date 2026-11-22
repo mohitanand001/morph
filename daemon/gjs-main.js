@@ -158,6 +158,15 @@ const update = {
 
 // Optional table OCR (morph --enable-ocr). A private Python environment next to Morph, run only when you click.
 const OCR_DIR = GLib.build_filenamev([GLib.getenv('XDG_DATA_HOME') || GLib.build_filenamev([GLib.get_home_dir(), '.local', 'share']), 'morph-ocr']);
+function ocrLog(text) {
+  try {
+    const dir = GLib.getenv('XDG_CACHE_HOME') || GLib.build_filenamev([GLib.get_home_dir(), '.cache']);
+    const f = Gio.File.new_for_path(GLib.build_filenamev([dir, 'morph-ocr.log']));
+    const st = f.append_to(Gio.FileCreateFlags.PRIVATE, null);
+    st.write_all(new TextEncoder().encode('--- read ' + new Date().toISOString() + '\n' + text + '\n'), null);
+    st.close(null);
+  } catch (e) { /* logging is best effort */ }
+}
 let ocrProc = null;
 const ocr = {
   ready: () => GLib.file_test(GLib.build_filenamev([OCR_DIR, 'ready']), GLib.FileTest.EXISTS),
@@ -201,24 +210,30 @@ const ocr = {
   // Reads the copied image and returns { ok, html } or { ok: false, error }. Never leaves a copy of the image behind.
   async run() {
     const img = await shell.readImage();
-    if (!img) return { ok: false, error: 'no_image' };
+    if (!img) { ocrLog('GNOME\'s helper could not hand over the copied image.'); return { ok: false, error: 'no_image' }; }
     try {
       const py = GLib.build_filenamev([OCR_DIR, 'venv', 'bin', 'python']);
       const worker = root.get_child('ocr').get_child('morph_ocr.py').get_path();
       const r = await new Promise((resolve) => {
         try {
           // Same sandbox as the install: models and caches stay in Morph's OCR folder, never in your own ~/.paddlex.
-          const launcher = new Gio.SubprocessLauncher({ flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE });
+          const launcher = new Gio.SubprocessLauncher({ flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE });
           const ocrHome = GLib.build_filenamev([OCR_DIR, 'home']);
           GLib.mkdir_with_parents(ocrHome, 0o700);
           launcher.setenv('HOME', ocrHome, true);
           launcher.setenv('PADDLE_PDX_CACHE_HOME', GLib.build_filenamev([OCR_DIR, 'models']), true);
           launcher.setenv('PYTHONNOUSERSITE', '1', true);
           const p = launcher.spawnv([py, worker, img]);
-          const timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 150, () => { try { p.force_exit(); } catch (e) { /* done */ } return GLib.SOURCE_REMOVE; });
+          let timedOut = false;
+          const timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 300, () => { timedOut = true; try { p.force_exit(); } catch (e) { /* done */ } return GLib.SOURCE_REMOVE; });
           p.communicate_utf8_async(null, null, (proc, res) => {
-            GLib.source_remove(timer);
-            try { const [, out] = proc.communicate_utf8_finish(res); resolve(out || ''); } catch (e) { resolve(''); }
+            if (!timedOut) GLib.source_remove(timer);
+            let out = '', err = '';
+            try { [, out, err] = proc.communicate_utf8_finish(res); } catch (e) { /* nothing */ }
+            // A failed read is logged so it can be fixed: the error and the end of PaddleOCR's messages, never the image or the table.
+            const last = String(out || '').trim().split('\n').pop();
+            if (!/"ok": true/.test(last)) ocrLog((timedOut ? 'timed out after 300 s. ' : '') + 'result: ' + last.slice(0, 300) + '\n' + String(err || '').slice(-1500));
+            resolve(out || '');
           });
         } catch (e) { resolve(''); }
       });

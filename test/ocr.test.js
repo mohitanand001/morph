@@ -61,6 +61,28 @@ function desk(opts) {
     check('no table found: nothing is written and the user is told', d.writes.length === 0 && /No table found/.test(JSON.stringify(d.last())));
   }
   {
+    const d = desk({ result: { ok: false, error: 'failed' } }); const c = createCore(d.io);
+    await c.start();
+    c.focus({ app: 'slack', title: 'x - Slack' }, 15);
+    c.action('fix:jira');
+    await new Promise((r) => setTimeout(r, 30));
+    const src = d.last().source || {};
+    check('a failed read: the card says "Image copied" and why, not "Copied from Image copied"', src.title === 'Image copied' && /Couldn’t read that image/.test(JSON.stringify(d.last())) && !/Copied from Image/.test(JSON.stringify(d.last())), JSON.stringify(src));
+    c.action('fix:slack');
+    await new Promise((r) => setTimeout(r, 30));
+    check('picking another app does not read the same image again', d.ocrRuns === 1);
+  }
+  {
+    const d = desk({}); const c = createCore(d.io);
+    await c.start();
+    c.focus({ app: 'slack', title: 'x - Slack' }, 15);
+    c.action('fix:jira');
+    await new Promise((r) => setTimeout(r, 30));
+    c.action('fix:confluence');
+    await new Promise((r) => setTimeout(r, 30));
+    check('a table read once is reused for the next app', d.ocrRuns === 1 && d.writes.length === 2);
+  }
+  {
     const d = desk({ ready: false }); const c = createCore(d.io);
     await c.start();
     c.focus({ app: 'slack', title: 'x - Slack' }, 15);
