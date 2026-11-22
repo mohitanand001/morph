@@ -1,119 +1,60 @@
 #!/usr/bin/env python3
-"""Reads a table out of an image with PaddleOCR, on this machine only.
+"""Reads a table out of an image with RapidOCR, on this machine only.
 
   morph_ocr.py IMAGE.png     prints one JSON line:  {"ok": true, "html": "<table>...</table>", "cells": 12}
                               or                    {"ok": false, "error": "no_table"}
-  morph_ocr.py --warmup      loads the models once (this is the only step that downloads anything)
-  morph_ocr.py --selftest    checks the result parsing without PaddleOCR (used by Morph's tests)
+  morph_ocr.py --warmup      loads the text models once (the only step that may download anything)
+  morph_ocr.py --selftest    checks the table building without RapidOCR (used by Morph's tests)
 
-Morph never sends the image anywhere: this script is run locally and its answer is read from its output.
+RapidOCR reads the words and where they are; Morph rebuilds the table from those positions (rows by height,
+columns by overlapping horizontal ranges). Morph never sends the image anywhere: this script runs locally
+and its answer is read from its output.
 """
 import json
-import os
-import re
 import sys
 
-# PaddlePaddle's oneDNN (MKLDNN) CPU path fails on some versions with
-# "ConvertPirAttribute2RuntimeAttribute not support": run without it (a little slower, and reliable).
-os.environ.setdefault("FLAGS_use_mkldnn", "0")
-if "--warmup" not in sys.argv:  # after the warm-up, no network checks
-    os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
-
-TABLE_KEYS = ("pred_html", "html")
 MAX_HTML = 400000
 
 
-def find_tables(obj, out):
-    """Every HTML table string anywhere in a (nested) result. The result layout differs between PaddleOCR versions."""
-    if isinstance(obj, dict):
-        for key, val in obj.items():
-            if key in TABLE_KEYS and isinstance(val, str) and "<table" in val.lower():
-                out.append(val)
-            else:
-                find_tables(val, out)
-    elif isinstance(obj, (list, tuple)):
-        for item in obj:
-            find_tables(item, out)
-    return out
+def make_engine():
+    """RapidOCR 2.x/3.x ("rapidocr" with onnxruntime), or the older "rapidocr_onnxruntime" package."""
+    try:
+        from rapidocr import RapidOCR
+        return "new", RapidOCR()
+    except ImportError:
+        from rapidocr_onnxruntime import RapidOCR
+        return "old", RapidOCR()
 
 
-def as_plain(res):
-    """A prediction object as plain dicts and lists."""
-    for attr in ("json", "res"):
-        val = getattr(res, attr, None)
-        if val is not None:
-            return val
-    return res
+def as_list(v):
+    return v.tolist() if hasattr(v, "tolist") else list(v)
 
 
-def clean_table(html):
-    """Just the table: PaddleOCR wraps it in <html><body>. Scripts and handlers are never kept."""
-    m = re.search(r"<table.*?</table>", html, re.S | re.I)
-    table = m.group(0) if m else html
-    table = re.sub(r"<(script|style)\b.*?</\1>", "", table, flags=re.S | re.I)
-    table = re.sub(r"\son\w+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", "", table, flags=re.I)
-    return table[:MAX_HTML]
+def box_of(points):
+    """[x1, y1, x2, y2] from a four-point polygon (or a box already in that form)."""
+    pts = as_list(points)
+    if len(pts) == 4 and not isinstance(pts[0], (list, tuple)):
+        return [float(v) for v in pts]
+    xs = [float(p[0]) for p in pts]
+    ys = [float(p[1]) for p in pts]
+    return [min(xs), min(ys), max(xs), max(ys)]
+
+
+def words_of(kind, result):
+    """(texts, boxes) from either package's result."""
+    if kind == "new":
+        boxes = getattr(result, "boxes", None)
+        txts = getattr(result, "txts", None)
+        if boxes is None or txts is None:
+            return [], []
+        return [str(t) for t in as_list(txts)], [box_of(b) for b in as_list(boxes)]
+    rows = result[0] if isinstance(result, tuple) else result
+    rows = rows or []
+    return [str(r[1]) for r in rows], [box_of(r[0]) for r in rows]
 
 
 def count_cells(html):
-    return len(re.findall(r"<t[dh]\b", html, re.I))
-
-
-def _make(cls, options):
-    """Build a pipeline with the options this PaddleOCR version knows; drop the ones it does not.
-    PaddleOCR reports an unknown option as a TypeError or a ValueError ("Unknown argument: x")."""
-    opts = dict(options)
-    while True:
-        try:
-            return cls(**opts)
-        except (TypeError, ValueError) as e:
-            bad = next((k for k in opts if k in str(e)), None)
-            if not bad:
-                raise
-            opts.pop(bad)
-
-
-# Only what each reader uses: the table reader has no seal, formula or chart parts.
-PIPELINE_OPTIONS = {
-    "TableRecognitionPipelineV2": {"use_doc_orientation_classify": False, "use_doc_unwarping": False, "enable_mkldnn": False},
-    "PPStructureV3": {"use_doc_orientation_classify": False, "use_doc_unwarping": False, "use_seal_recognition": False,
-                      "use_formula_recognition": False, "use_chart_recognition": False, "enable_mkldnn": False},
-}
-
-
-def build_pipeline():
-    # PaddleOCR 3.x: the table-only pipeline first (fewer models to download), then the full document one.
-    errors = []
-    for name in ("TableRecognitionPipelineV2", "PPStructureV3"):
-        try:
-            mod = __import__("paddleocr", fromlist=[name])
-            cls = getattr(mod, name)
-        except (ImportError, AttributeError) as e:
-            errors.append(str(e))
-            continue
-        return "v3", _make(cls, PIPELINE_OPTIONS[name])
-    try:
-        from paddleocr import PPStructure  # PaddleOCR 2.x
-    except ImportError:
-        raise RuntimeError("PaddleOCR has no table pipeline here: " + "; ".join(errors)[:150])
-    return "v2", PPStructure(table=True, ocr=True, layout=True, show_log=False)
-
-
-def find_ocr(obj, best=None):
-    """The OCR'd words with their boxes: the dict with the most rec_texts anywhere in the result."""
-    if isinstance(obj, dict):
-        texts = obj.get("rec_texts")
-        boxes = obj.get("rec_boxes")
-        if boxes is None and obj.get("rec_polys") is not None:
-            boxes = [[min(p[0] for p in q), min(p[1] for p in q), max(p[0] for p in q), max(p[1] for p in q)] for q in obj["rec_polys"]]
-        if isinstance(texts, list) and boxes is not None and len(texts) == len(boxes) and (best is None or len(texts) > len(best[0])):
-            best = (texts, [list(b)[:4] for b in boxes])
-        for val in obj.values():
-            best = find_ocr(val, best)
-    elif isinstance(obj, (list, tuple)):
-        for item in obj:
-            best = find_ocr(item, best)
-    return best
+    return html.count("<td>") + html.count("<th>")
 
 
 def grid_from_words(texts, boxes):
@@ -190,22 +131,12 @@ def grid_html(grid):
 
 
 def read_table(path):
-    kind, pipe = build_pipeline()
-    if kind == "v3":
-        results = [as_plain(r) for r in pipe.predict(input=path)]
-    else:
-        import cv2
-        results = pipe(cv2.imread(path))
-    # First choice: the grid rebuilt from the words' positions. Fallback: the table-structure model's HTML.
-    words = find_ocr(results)
-    grid = grid_from_words(*words) if words else None
-    if grid:
-        html = grid_html(grid)
-        return {"ok": True, "html": html, "cells": count_cells(html), "how": "grid"}
-    tables = find_tables(results, [])
-    if not tables:
+    kind, engine = make_engine()
+    texts, boxes = words_of(kind, engine(path))
+    grid = grid_from_words(texts, boxes)
+    if not grid:
         return {"ok": False, "error": "no_table"}
-    html = clean_table(max(tables, key=len))
+    html = grid_html(grid)[:MAX_HTML]
     return {"ok": True, "html": html, "cells": count_cells(html)}
 
 
@@ -225,36 +156,18 @@ def _grid_salary_sheet():
                  ["Michael Johnson", "4.800", "1.200", "400", "5.600"]]
 
 
-def _make_drops_unknown():
-    """A reader that rejects an option the way PaddleOCR 3 does is built without it."""
-    class Fake:
-        def __init__(self, **kw):
-            for k in kw:
-                if k not in ("use_doc_orientation_classify",):
-                    raise ValueError("Unknown argument: " + k)
-            self.kw = kw
-    try:
-        return _make(Fake, {"use_doc_orientation_classify": False, "use_formula_recognition": False}).kw == {"use_doc_orientation_classify": False}
-    except Exception:  # noqa: BLE001
-        return False
-
-
 def selftest():
-    v3 = [{"res": {"table_res_list": [{"pred_html": "<html><body><table><tr><td>a</td><td>b</td></tr></table></body></html>"}]}}]
-    v2 = [{"type": "table", "res": {"html": "<table><tr><td>x</td></tr></table>"}}, {"type": "text", "res": [{"text": "hi"}]}]
-    none = [{"res": {"overall_ocr_res": {"rec_texts": ["hello"]}}}]
-    evil = '<table onclick="x()"><tr><td>1<script>alert(1)</script></td></tr></table>'
+    class R:  # what RapidOCR 2.x/3.x returns
+        boxes = [[[0, 0], [10, 0], [10, 5], [0, 5]]]
+        txts = ("a",)
     checks = [
-        find_tables(v3, []) == [v3[0]["res"]["table_res_list"][0]["pred_html"]],
-        find_tables(v2, []) == ["<table><tr><td>x</td></tr></table>"],
-        find_tables(none, []) == [],
-        clean_table(v3[0]["res"]["table_res_list"][0]["pred_html"]) == "<table><tr><td>a</td><td>b</td></tr></table>",
-        "script" not in clean_table(evil) and "onclick" not in clean_table(evil),
-        count_cells("<table><tr><th>a</th><td>b</td></tr></table>") == 2,
-        _make_drops_unknown(),
         _grid_salary_sheet(),
-        "use_formula_recognition" not in PIPELINE_OPTIONS["TableRecognitionPipelineV2"],
-        all(o.get("enable_mkldnn") is False for o in PIPELINE_OPTIONS.values()) and os.environ.get("FLAGS_use_mkldnn") == "0",
+        box_of([[3, 4], [9, 4], [9, 8], [3, 8]]) == [3.0, 4.0, 9.0, 8.0],
+        words_of("new", R()) == (["a"], [[0.0, 0.0, 10.0, 5.0]]),
+        words_of("old", ([[[[1, 2], [5, 2], [5, 6], [1, 6]], "b", 0.9]], 0.1)) == (["b"], [[1.0, 2.0, 5.0, 6.0]]),
+        words_of("old", (None, 0.1)) == ([], []),
+        grid_from_words(["only", "words"], [[0, 0, 10, 5], [0, 20, 10, 25]]) is None,
+        "<script>" not in grid_html([["<script>", "b"], ["1", "2"]]),
     ]
     print(json.dumps({"ok": all(checks), "checks": checks}))
     return 0 if all(checks) else 1
@@ -264,12 +177,12 @@ def main(argv):
     if len(argv) == 2 and argv[1] == "--selftest":
         return selftest()
     real_out = sys.stdout
-    sys.stdout = sys.stderr  # PaddleOCR prints progress; only our one JSON line may reach stdout
+    sys.stdout = sys.stderr  # libraries may print; only our one JSON line may reach stdout
     try:
         if len(argv) == 2 and argv[1] == "--warmup":
-            build_pipeline()
+            make_engine()
             out = {"ok": True}
-        elif len(argv) == 2 and os.path.isfile(argv[1]):
+        elif len(argv) == 2:
             out = read_table(argv[1])
         else:
             out = {"ok": False, "error": "usage"}

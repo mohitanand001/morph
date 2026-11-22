@@ -210,11 +210,15 @@ function createCore(io) {
         { kind: 'buttons', buttons: [{ label: 'Stop installing', action: 'ocr:askstop', kind: 'secondary' }] }];
     }
     if (ocrReady()) {
-      if (ocrAsk === 'off' && ocrCanManage()) return ask('Remove table OCR?', 'This deletes the OCR files (about 1 GB). Morph keeps working without it.', 'Remove', 'ocr:off', 'Keep it');
+      if (ocrAsk === 'off' && ocrCanManage()) return ask('Remove table OCR?', 'This deletes the OCR files (about 200 MB). Morph keeps working without it.', 'Remove', 'ocr:off', 'Keep it');
       return [{ kind: 'panel', tone: 'ok', icon: 'check_circle', title: 'Table OCR is on', text: 'A copied image is read only when you pick an app, on this device. Nothing is uploaded.' },
         ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Remove table OCR', action: 'ocr:askoff', kind: 'secondary' }] }] : [])];
     }
-    if (ocrAsk === 'on' && ocrCanManage()) return ask('Download about 1 GB?', 'This installs PaddleOCR once and needs internet. Images are read only on this computer, and only when you pick an app.', 'Install', 'ocr:on', 'Not now');
+    if (ocrAsk === 'on' && ocrCanManage()) return ask('Download about 200 MB?', 'This installs RapidOCR once and needs internet. Images are read only on this computer, and only when you pick an app.' + (ocrLegacy() ? ' The older, larger table OCR (about 3 GB) is removed first.' : ''), 'Install', 'ocr:on', 'Not now');
+    if (ocrLegacy()) {
+      return [{ kind: 'panel', tone: 'warn', icon: 'download', title: 'Table OCR got much smaller', text: 'The new version is about 200 MB instead of 3 GB, and reads a screenshot in about a second. Update to keep reading tables from images.' },
+        ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Update table OCR', action: 'ocr:ask', kind: 'primary' }] }] : [])];
+    }
     return [{ kind: 'panel', tone: ocrFail ? 'warn' : 'plain', icon: ocrFail ? 'warning' : 'table', title: 'Table OCR (optional)',
         text: ocrFail ? ocrFail : 'Reads tables from copied screenshots, on this device. Off until you turn it on.' },
       ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: ocrFail ? 'Try again' : 'Enable table OCR', action: 'ocr:ask', kind: 'primary' }] }] : [])];
@@ -223,7 +227,7 @@ function createCore(io) {
     if (arg === 'ask' || arg === 'askstop' || arg === 'askoff') { ocrAsk = arg === 'ask' ? 'on' : arg.slice(3); sendPill(); return; }
     if (arg === 'no') { ocrAsk = ''; sendPill(); return; }
     ocrAsk = '';
-    if (arg === 'on' && ocrCanManage() && !ocrJob && !ocrReady()) {
+    if (arg === 'on' && ocrCanManage() && !ocrJob && !ocrReady()) { // also replaces an older (PaddleOCR) install
       ocrFail = '';
       ocrJob = { line: 'Starting…', cancelled: false };
       const job = ocrJob;
@@ -231,7 +235,7 @@ function createCore(io) {
       io.ocr.install((line) => {
         if (ocrJob !== job || !line) return;
         const m = /Step (\d) of (\d)/.exec(line);
-        if (m) { const at = [0, 0.05, 0.12, 0.65, 0.85][Number(m[1]) - 1]; job.progress = typeof at === 'number' ? at : job.progress; job.step = m[1] + ' of ' + m[2]; }
+        if (m) { const at = [0, 0.05, 0.15, 0.8][Number(m[1]) - 1]; job.progress = typeof at === 'number' ? at : job.progress; job.step = m[1] + ' of ' + m[2]; }
         job.line = String(line).replace(/^Step \d of \d:\s*/, '').slice(0, 110);
         sendPill();
       },
@@ -362,8 +366,8 @@ function createCore(io) {
             'Start at login',
             'The tab on the screen edge (its GNOME helper)',
             'The morph command',
-            ...(ocrReady() || ocrJob ? ['Table OCR: PaddleOCR and its models in Morph\'s own folder'] : []) ] },
-          { kind: 'panel', tone: 'warn', icon: 'warning', title: 'This deletes your Morph settings', text: 'Nothing you copy is ever stored by Morph, so there is no clipboard data to lose. Your documents and other files are not touched.' + (ocrReady() || ocrJob ? ' A PaddleOCR you installed yourself, outside Morph, is not touched either.' : '') },
+            ...(ocrReady() || ocrLegacy() || ocrJob ? ['Table OCR: RapidOCR and its models in Morph\'s own folder'] : []) ] },
+          { kind: 'panel', tone: 'warn', icon: 'warning', title: 'This deletes your Morph settings', text: 'Nothing you copy is ever stored by Morph, so there is no clipboard data to lose. Your documents and other files are not touched.' + (ocrReady() || ocrLegacy() || ocrJob ? ' An OCR package you installed yourself, outside Morph, is not touched either.' : '') },
           { kind: 'buttons', buttons: io.uninstall ? [
             { label: 'Keep Morph', action: 'view:settings', kind: 'secondary' },
             { label: 'Uninstall Morph', action: 'uninstall:', kind: 'danger', confirm: { title: 'Uninstall Morph?', body: 'This removes Morph and its settings from this account. You can install it again later.', ok: 'Uninstall' } } ] : [{ label: 'Keep Morph', action: 'view:settings', kind: 'secondary' }] },
@@ -445,7 +449,7 @@ function createCore(io) {
       gear: 'view:settings',
       source: copy ? { icon: /table/i.test(copy.what || '') ? 'table' : 'content_paste', dest: place ? place.dest : '', title: 'Copied from ' + (place ? place.tool : copy.from), sub: [place ? place.where : '', copy.what].filter(Boolean).join(' · ') }
         : skipped ? { icon: 'lock', title: 'Copied from ' + lastSkip.app, sub: lastSkip.pm ? 'Never read: a password manager' : 'Not read: ' + lastSkip.app + ' is off in Settings → Apps' }
-        : ocrBusy ? { icon: 'image', title: 'Reading the table…', sub: 'Up to a minute the first time' }
+        : ocrBusy ? { icon: 'image', title: 'Reading the table…', sub: 'A few seconds' }
         : ocrImage ? { icon: 'image', title: 'Image copied', sub: ocrNote || 'Pick an app to read its table' }
         : imageOnly ? { icon: 'image', title: 'Image copied', sub: 'Nothing to convert. Paste it as it is.' }
         : { icon: 'content_paste', title: 'Nothing copied yet', sub: 'Copy something to start' },
@@ -544,6 +548,7 @@ function createCore(io) {
   }
   // Optional table OCR: an image on the clipboard is read only when you pick an app, never in the background.
   const ocrReady = () => !!(io.ocr && io.ocr.ready() && shellVersion >= 15);
+  const ocrLegacy = () => !!(io.ocr && io.ocr.legacy && io.ocr.legacy() && shellVersion >= 15); // the old PaddleOCR install
   let ocrNote = '';      // why the last image read gave nothing
   let ocrFromImage = false; // the clip being converted was read from an image
   let ocrSeq = -1, ocrSeqClip = null;   // the copy an image was last read for, and its table (null: it failed)

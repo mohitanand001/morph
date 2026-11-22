@@ -8,7 +8,7 @@
 #   morph --update      fetch the newest version from the website and install it
 #   morph --status      is it running, is the GNOME helper installed
 #   morph --setup       show the welcome card again
-#   morph --enable-ocr  optional: read tables from copied images (installs PaddleOCR for this account, ~1 GB)
+#   morph --enable-ocr  optional: read tables from copied images (installs RapidOCR for this account, ~200 MB)
 #   morph --disable-ocr remove that again
 #   morph --uninstall   remove everything: the program, helper, settings, logs, caches and this folder
 set -u
@@ -30,9 +30,9 @@ case "$APP_DIR" in /usr/*|/opt/*) IS_PKG=1 ;; esac
 # Optional table OCR lives apart from the app folder so an update never throws it away.
 OCR_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/morph-ocr"
 # Everything table OCR downloads stays inside OCR_DIR: its own Python environment, and for the OCR runs a home
-# folder of its own, so PaddleOCR's model caches (~/.paddlex, ~/.cache/...) land there too. A PaddleOCR you
-# installed yourself, and its caches, are never used or touched.
-ocr_run() { mkdir -p "$OCR_DIR/home"; env HOME="$OCR_DIR/home" PADDLE_PDX_CACHE_HOME="$OCR_DIR/models" PYTHONNOUSERSITE=1 "$@"; }
+# folder of its own, so any cache the libraries keep lands there too. An OCR package you installed yourself,
+# and its caches, are never used or touched.
+ocr_run() { mkdir -p "$OCR_DIR/home"; env HOME="$OCR_DIR/home" PYTHONNOUSERSITE=1 "$@"; }
 UPDATE_URL="${MORPH_UPDATE_URL:-https://mohitanand001.github.io/morph/version.json}"
 
 say() { printf '%s\n' "$*"; }
@@ -284,27 +284,31 @@ do_update() {
 }
 
 
-# Optional: read tables out of copied images with PaddleOCR. Private Python environment in one folder, removed by
+# Optional: read tables out of copied images with RapidOCR. Private Python environment in one folder, removed by
 # --disable-ocr. The only network use is this install: the packages from PyPI and the models, once. After that
 # Morph runs it offline, and only when you click.
 do_enable_ocr() {
   command -v python3 >/dev/null 2>&1 || { say "Needs python3. On Ubuntu:  sudo apt install python3 python3-venv"; exit 1; }
   python3 -c 'import venv, ensurepip' 2>/dev/null || { say "Needs python3-venv. On Ubuntu:  sudo apt install python3-venv"; exit 1; }
-  say "Table OCR installs PaddleOCR into $OCR_DIR (about 1 GB, one time, needs internet)."
+  # An older table OCR (PaddleOCR, about 3 GB) is replaced by the much smaller RapidOCR.
+  if [ -d "$OCR_DIR" ] && [ "$(cat "$OCR_DIR/engine" 2>/dev/null)" != rapidocr ]; then
+    case "$OCR_DIR" in */morph-ocr) rm -rf "$OCR_DIR"; say "Removed the older, larger table OCR." ;; esac
+  fi
+  say "Table OCR installs RapidOCR into $OCR_DIR (about 200 MB, one time, needs internet)."
   say "Nothing is sent anywhere when you use it. Remove it any time with:  morph --disable-ocr"
   mkdir -p "$OCR_DIR"
-  # "Step n of 5" lines drive the progress bar in Settings → Image tables.
-  say "Step 1 of 5: Preparing a private Python environment..."
+  # "Step n of 4" lines drive the progress bar in Settings → Images.
+  say "Step 1 of 4: Preparing a private Python environment..."
   [ -x "$OCR_DIR/venv/bin/python" ] || python3 -m venv "$OCR_DIR/venv" || { say "Could not create the Python environment."; rm -rf "$OCR_DIR"; exit 1; }
-  say "Step 2 of 5: Updating the Python installer..."
+  say "Step 2 of 4: Updating the Python installer..."
   "$OCR_DIR/venv/bin/python" -m pip install --quiet --no-cache-dir --upgrade pip || true
-  say "Step 3 of 5: Installing PaddlePaddle, the biggest part (a few minutes)..."
-  "$OCR_DIR/venv/bin/python" -m pip install --quiet --no-cache-dir "paddlepaddle>=3.0,<4" || { say "The install failed. Nothing was changed in Morph."; rm -rf "$OCR_DIR"; exit 1; }
-  say "Step 4 of 5: Installing PaddleOCR..."
-  # The [doc-parser] extra brings what the table pipeline needs on PaddleOCR 3.1 and newer.
-  "$OCR_DIR/venv/bin/python" -m pip install --quiet --no-cache-dir "paddleocr[doc-parser]>=3.0,<4" || { say "The install failed. Nothing was changed in Morph."; rm -rf "$OCR_DIR"; exit 1; }
-  say "Step 5 of 5: Downloading the table models (one time)..."
-  # If the models fail, the installed packages are kept (no second 1 GB download): Try again only redoes this step.
+  say "Step 3 of 4: Installing RapidOCR..."
+  # RapidOCR 2.x/3.x with the ONNX runtime; the older all-in-one package where that is not available.
+  "$OCR_DIR/venv/bin/python" -m pip install --quiet --no-cache-dir "rapidocr>=2,<4" "onnxruntime>=1.16" \
+    || "$OCR_DIR/venv/bin/python" -m pip install --quiet --no-cache-dir "rapidocr_onnxruntime>=1.3" \
+    || { say "The install failed. Nothing was changed in Morph."; rm -rf "$OCR_DIR"; exit 1; }
+  say "Step 4 of 4: Getting the text models ready (one time)..."
+  # If this fails, the installed packages are kept: Try again only redoes this step.
   # The reason goes to ~/.cache/morph-ocr.log and its first line is shown in Settings.
   OCR_LOG="${XDG_CACHE_HOME:-$HOME/.cache}/morph-ocr.log"
   mkdir -p "$(dirname "$OCR_LOG")"
@@ -315,8 +319,9 @@ do_enable_ocr() {
     say "Could not load the models${why:+: $why}. Details: $OCR_LOG"
     exit 1
   fi
+  printf 'rapidocr' > "$OCR_DIR/engine"
   : > "$OCR_DIR/ready"
-  say "Table OCR is on. Copy a screenshot of a table, then click an app in the pill."
+  say "Table OCR is on. Copy a screenshot of a table, then pick an app in Morph."
   exit 0
 }
 do_disable_ocr() {
@@ -330,7 +335,9 @@ do_status() {
     if ext_current; then say "Helper: installed, up to date"; else say "Helper: missing or out of date (run --install)"; fi
     gnome-extensions info "$EXT_UUID" 2>/dev/null | grep -i "state" | sed 's/^ */Helper: /'
   fi
-  if [ -f "$OCR_DIR/ready" ]; then say "Table OCR: on"; else say "Table OCR: off (morph --enable-ocr to turn it on)"; fi
+  if [ -f "$OCR_DIR/ready" ] && [ "$(cat "$OCR_DIR/engine" 2>/dev/null)" = rapidocr ]; then say "Table OCR: on"
+  elif [ -f "$OCR_DIR/ready" ]; then say "Table OCR: the older, larger version (run morph --enable-ocr to switch to the small one)"
+  else say "Table OCR: off (morph --enable-ocr to turn it on)"; fi
 }
 
 # Forget that setup was answered and start again: the welcome card opens as it did on the first run.

@@ -10,7 +10,7 @@ let passed = 0; let failed = 0;
 function check(n, c, d) { if (c) passed++; else { failed++; console.log('FAIL  ' + n + (d ? '\n      ' + d : '')); } }
 const root = path.join(__dirname, '..');
 
-// The worker, without PaddleOCR.
+// The worker, without RapidOCR.
 const py = spawnSync('python3', ['-I', path.join(root, 'ocr', 'morph_ocr.py'), '--selftest'], { encoding: 'utf8' });
 check('OCR worker result parsing works', py.status === 0 && /"ok": true/.test(py.stdout), py.stdout + py.stderr);
 const usage = spawnSync('python3', ['-I', path.join(root, 'ocr', 'morph_ocr.py'), '/no/such/file.png'], { encoding: 'utf8' });
@@ -127,7 +127,7 @@ function desk(opts) {
     const blocks = () => JSON.stringify(d.last().pane.blocks);
     check('off: the pane offers an Enable table OCR button', /Enable table OCR/.test(blocks()) && /ocr:ask/.test(blocks()) && !/confirm/.test(blocks()));
     c.action('ocr:ask');
-    check('asking happens inside the pill: 1 GB, Install or Not now', /Download about 1 GB/.test(blocks()) && /"Install"/.test(blocks()) && /Not now/.test(blocks()) && /ocr:on/.test(blocks()));
+    check('asking happens inside Morph: about 200 MB, Install or Not now', /Download about 200 MB/.test(blocks()) && /RapidOCR/.test(blocks()) && /"Install"/.test(blocks()) && /Not now/.test(blocks()) && /ocr:on/.test(blocks()));
     c.action('ocr:no');
     check('Not now goes back, nothing installed', /Enable table OCR/.test(blocks()) && !state.starts);
     c.action('ocr:ask'); c.action('ocr:on');
@@ -136,26 +136,27 @@ function desk(opts) {
     check('Stop installing asks first, in the pill', /Stop installing\?/.test(blocks()) && /Keep installing/.test(blocks()));
     c.action('ocr:no');
     check('Keep installing goes back to the progress', /Installing table OCR/.test(blocks()) && !state.cancelled);
-    state.installing.onLine('Step 3 of 5: Installing PaddlePaddle, the biggest part (a few minutes)...');
-    check('the progress bar follows the installer steps', /"progress":0\.12/.test(blocks()) && /step 3 of 5/.test(blocks()) && /Installing PaddlePaddle/.test(blocks()) && !/Step 3 of 5:/.test(blocks()));
+    state.installing.onLine('Step 3 of 4: Installing RapidOCR...');
+    check('the progress bar follows the installer steps', /"progress":0\.15/.test(blocks()) && /step 3 of 4/.test(blocks()) && /Installing RapidOCR/.test(blocks()) && !/Step 3 of 4:/.test(blocks()));
     {
       const fs2 = require('fs'), path2 = require('path');
       const sh = fs2.readFileSync(path2.join(__dirname, '..', 'bin', 'morph'), 'utf8');
       const gj = fs2.readFileSync(path2.join(__dirname, '..', 'daemon', 'gjs-main.js'), 'utf8');
       check('OCR is installed into its own Python environment, never the system or user one', /python3 -m venv "\$OCR_DIR\/venv"/.test(sh) && !/--system-site-packages/.test(sh) && !/pip install --user/.test(sh) && /--no-cache-dir/.test(sh));
-      check('OCR runs (warm-up and reads) keep models and caches inside the OCR folder', /HOME="\$OCR_DIR\/home" PADDLE_PDX_CACHE_HOME="\$OCR_DIR\/models" PYTHONNOUSERSITE=1/.test(sh) && /ocr_run "\$OCR_DIR\/venv\/bin\/python"/.test(sh) && /setenv\('HOME', ocrHome/.test(gj) && /setenv\('PADDLE_PDX_CACHE_HOME'/.test(gj) && /setenv\('PYTHONNOUSERSITE'/.test(gj));
+      check('OCR runs (warm-up and reads) keep any caches inside the OCR folder', /HOME="\$OCR_DIR\/home" PYTHONNOUSERSITE=1/.test(sh) && /ocr_run "\$OCR_DIR\/venv\/bin\/python"/.test(sh) && /setenv\('HOME', ocrHome/.test(gj) && /setenv\('PYTHONNOUSERSITE'/.test(gj));
+      check('the installer uses RapidOCR (small), replaces an older PaddleOCR install, and marks the engine', /rapidocr>=2,<4/.test(sh) && /rapidocr_onnxruntime/.test(sh) && !/paddlepaddle/.test(sh) && /Removed the older, larger table OCR/.test(sh) && /printf 'rapidocr' > "\$OCR_DIR\/engine"/.test(sh));
       check('uninstall and Remove delete only Morph\'s OCR folder and log', /rm -rf "\$CACHE\/formatter-icons" "\$OCR_DIR"/.test(sh) && /morph-ocr\.log/.test(sh) && /\*\/morph-ocr\) rm -rf "\$OCR_DIR"/.test(sh) && !/paddlex/.test(sh.replace(/~\/\.paddlex/g, '')));
     }
-    check('the installer prints the five steps', (require('fs').readFileSync(require('path').join(__dirname, '..', 'bin', 'morph'), 'utf8').match(/say "Step \d of 5:/g) || []).length === 5);
-    state.installing.onLine('Installing PaddleOCR (this takes a few minutes)...');
-    check('the latest progress line is shown', /Installing PaddleOCR/.test(blocks()));
+    check('the installer prints the four steps', (require('fs').readFileSync(require('path').join(__dirname, '..', 'bin', 'morph'), 'utf8').match(/say "Step \d of 4:/g) || []).length === 4);
+    state.installing.onLine('Step 4 of 4: Getting the text models ready (one time)...');
+    check('the latest progress line is shown', /Getting the text models ready/.test(blocks()));
     c.action('ocr:on');
     check('a second click does not start a second install', state.starts === 1);
     state.ready = true; state.installing.onDone(true);
     c.action('view:uninstall');
     {
       const u = JSON.stringify(d.last().pane.blocks);
-      check('Uninstall lists the table OCR files with the rest, and says your own PaddleOCR stays', /Table OCR: PaddleOCR and its models in Morph's own folder/.test(u) && /PaddleOCR you installed yourself, outside Morph, is not touched/.test(u), u.slice(0, 300));
+      check('Uninstall lists the table OCR files with the rest, and says your own OCR package stays', /Table OCR: RapidOCR and its models in Morph's own folder/.test(u) && /OCR package you installed yourself, outside Morph, is not touched/.test(u), u.slice(0, 300));
     }
     c.action('view:ocr');
     check('done: Table OCR is on, with Remove', /Table OCR is on/.test(blocks()) && /Remove table OCR/.test(blocks()));
@@ -166,6 +167,19 @@ function desk(opts) {
     check('failure: the reason is shown with Try again', /python3-venv/.test(blocks()) && /Try again/.test(blocks()));
     c.action('ocr:on'); c.action('ocr:cancel');
     check('cancel: stops the install and says nothing was kept', state.cancelled === true && /Cancelled/.test(blocks()));
+  }
+  {
+    // An older PaddleOCR install: Settings offers to replace it with the small one.
+    const d = desk({});
+    d.io.ocr = { ready: () => false, legacy: () => true, run: async () => ({ ok: false }), install: () => {}, remove: async () => true, cancel: () => {} };
+    const c = createCore(d.io);
+    await c.start();
+    c.focus({ app: 'slack', title: 'x - Slack' }, 15);
+    c.action('view:ocr');
+    const b = () => JSON.stringify(d.last().pane.blocks);
+    check('an older, larger install is offered an update to the small one', /Table OCR got much smaller/.test(b()) && /Update table OCR/.test(b()));
+    c.action('ocr:ask');
+    check('…and the question says the old one is removed first', /about 3 GB\) is removed first/.test(b()));
   }
   console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed (ocr)');
   process.exit(failed ? 1 : 0);

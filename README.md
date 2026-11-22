@@ -27,7 +27,7 @@ You can read the installer first: [`site/install.sh`](site/install.sh).
 - **Lists and indentation**: odd bullets, `a) b)` numbering, mixed tabs and spaces and Outlook's fake lists become real nested lists.
 - **Terminal output** and **PDF text** are cleaned up too.
 - **A slim tab** on the screen edge opens Morph, which shows what you copied and offers the apps to convert it for. Click an app, then paste with Ctrl+V.
-- **Optional table OCR**: reads a table from a copied image, on your device, only when you click. Turn it on in Settings, Privacy (a ~1 GB install of PaddleOCR).
+- **Optional table OCR**: reads a table from a copied screenshot, on your device, only when you click. Turn it on in Settings → Images (about 200 MB, using RapidOCR).
 
 ## Privacy
 

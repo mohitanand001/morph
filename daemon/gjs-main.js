@@ -158,6 +158,9 @@ const update = {
 
 // Optional table OCR (morph --enable-ocr). A private Python environment next to Morph, run only when you click.
 const OCR_DIR = GLib.build_filenamev([GLib.getenv('XDG_DATA_HOME') || GLib.build_filenamev([GLib.get_home_dir(), '.local', 'share']), 'morph-ocr']);
+function ocrEngine() {
+  try { const [ok, b] = GLib.file_get_contents(GLib.build_filenamev([OCR_DIR, 'engine'])); return ok ? new TextDecoder().decode(b).trim() : ''; } catch (e) { return ''; }
+}
 function ocrLog(text) {
   try {
     const dir = GLib.getenv('XDG_CACHE_HOME') || GLib.build_filenamev([GLib.get_home_dir(), '.cache']);
@@ -169,7 +172,9 @@ function ocrLog(text) {
 }
 let ocrProc = null;
 const ocr = {
-  ready: () => GLib.file_test(GLib.build_filenamev([OCR_DIR, 'ready']), GLib.FileTest.EXISTS),
+  // ready: the small RapidOCR install is in place. legacy: an older PaddleOCR install that should be replaced.
+  ready: () => GLib.file_test(GLib.build_filenamev([OCR_DIR, 'ready']), GLib.FileTest.EXISTS) && ocrEngine() === 'rapidocr',
+  legacy: () => GLib.file_test(GLib.build_filenamev([OCR_DIR, 'ready']), GLib.FileTest.EXISTS) && ocrEngine() !== 'rapidocr',
   // Settings → Privacy → Enable table OCR: runs `morph --enable-ocr` and reports its progress lines.
   install(onLine, onDone) {
     try {
@@ -224,12 +229,11 @@ const ocr = {
       const worker = root.get_child('ocr').get_child('morph_ocr.py').get_path();
       const r = await new Promise((resolve) => {
         try {
-          // Same sandbox as the install: models and caches stay in Morph's OCR folder, never in your own ~/.paddlex.
+          // Same sandbox as the install: any cache the libraries keep stays in Morph's OCR folder, never in your own home.
           const launcher = new Gio.SubprocessLauncher({ flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE });
           const ocrHome = GLib.build_filenamev([OCR_DIR, 'home']);
           GLib.mkdir_with_parents(ocrHome, 0o700);
           launcher.setenv('HOME', ocrHome, true);
-          launcher.setenv('PADDLE_PDX_CACHE_HOME', GLib.build_filenamev([OCR_DIR, 'models']), true);
           launcher.setenv('PYTHONNOUSERSITE', '1', true);
           const p = launcher.spawnv([py, worker, img]);
           let timedOut = false;
@@ -238,7 +242,7 @@ const ocr = {
             if (!timedOut) GLib.source_remove(timer);
             let out = '', err = '';
             try { [, out, err] = proc.communicate_utf8_finish(res); } catch (e) { /* nothing */ }
-            // A failed read is logged so it can be fixed: the error and the end of PaddleOCR's messages, never the image or the table.
+            // A failed read is logged so it can be fixed: the error and the end of the OCR library's messages, never the image or the table.
             const last = String(out || '').trim().split('\n').pop();
             if (!/"ok": true/.test(last)) ocrLog((timedOut ? 'timed out after 300 s. ' : '') + 'result: ' + last.slice(0, 300) + '\n' + String(err || '').slice(-1500));
             resolve(out || '');
