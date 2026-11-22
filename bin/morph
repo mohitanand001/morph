@@ -29,6 +29,10 @@ IS_PKG=0
 case "$APP_DIR" in /usr/*|/opt/*) IS_PKG=1 ;; esac
 # Optional table OCR lives apart from the app folder so an update never throws it away.
 OCR_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/morph-ocr"
+# Everything table OCR downloads stays inside OCR_DIR: its own Python environment, and for the OCR runs a home
+# folder of its own, so PaddleOCR's model caches (~/.paddlex, ~/.cache/...) land there too. A PaddleOCR you
+# installed yourself, and its caches, are never used or touched.
+ocr_run() { mkdir -p "$OCR_DIR/home"; env HOME="$OCR_DIR/home" PADDLE_PDX_CACHE_HOME="$OCR_DIR/models" PYTHONNOUSERSITE=1 "$@"; }
 UPDATE_URL="${MORPH_UPDATE_URL:-https://mohitanand001.github.io/morph/version.json}"
 
 say() { printf '%s\n' "$*"; }
@@ -229,7 +233,7 @@ do_uninstall() {
   sed -i '/morph PATH/,+1d' "$HOME/.bashrc" 2>/dev/null || true
   sed -i '/formatter-linker PATH/,+1d' "$HOME/.bashrc" 2>/dev/null || true
   rm -rf "$CFG/morph" "$CFG/formatter" "$CFG/format-bridge" "$CFG/Format Bridge"
-  rm -f "$CACHE/morph.log" "$CACHE/formatter.log" "$CACHE/formatter-linker.log"
+  rm -f "$CACHE/morph.log" "$CACHE/morph-ocr.log" "$CACHE/formatter.log" "$CACHE/formatter-linker.log"
   rm -rf "$CACHE/formatter-icons" "$OCR_DIR"
   [ -n "${XDG_RUNTIME_DIR:-}" ] && rm -rf "$XDG_RUNTIME_DIR/morph"
   if [ "$IS_PKG" = 1 ]; then
@@ -293,18 +297,18 @@ do_enable_ocr() {
   say "Step 1 of 5: Preparing a private Python environment..."
   [ -x "$OCR_DIR/venv/bin/python" ] || python3 -m venv "$OCR_DIR/venv" || { say "Could not create the Python environment."; rm -rf "$OCR_DIR"; exit 1; }
   say "Step 2 of 5: Updating the Python installer..."
-  "$OCR_DIR/venv/bin/python" -m pip install --quiet --upgrade pip || true
+  "$OCR_DIR/venv/bin/python" -m pip install --quiet --no-cache-dir --upgrade pip || true
   say "Step 3 of 5: Installing PaddlePaddle, the biggest part (a few minutes)..."
-  "$OCR_DIR/venv/bin/python" -m pip install --quiet "paddlepaddle>=3.0,<4" || { say "The install failed. Nothing was changed in Morph."; rm -rf "$OCR_DIR"; exit 1; }
+  "$OCR_DIR/venv/bin/python" -m pip install --quiet --no-cache-dir "paddlepaddle>=3.0,<4" || { say "The install failed. Nothing was changed in Morph."; rm -rf "$OCR_DIR"; exit 1; }
   say "Step 4 of 5: Installing PaddleOCR..."
   # The [doc-parser] extra brings what the table pipeline needs on PaddleOCR 3.1 and newer.
-  "$OCR_DIR/venv/bin/python" -m pip install --quiet "paddleocr[doc-parser]>=3.0,<4" || { say "The install failed. Nothing was changed in Morph."; rm -rf "$OCR_DIR"; exit 1; }
+  "$OCR_DIR/venv/bin/python" -m pip install --quiet --no-cache-dir "paddleocr[doc-parser]>=3.0,<4" || { say "The install failed. Nothing was changed in Morph."; rm -rf "$OCR_DIR"; exit 1; }
   say "Step 5 of 5: Downloading the table models (one time)..."
   # If the models fail, the installed packages are kept (no second 1 GB download): Try again only redoes this step.
   # The reason goes to ~/.cache/morph-ocr.log and its first line is shown in Settings.
   OCR_LOG="${XDG_CACHE_HOME:-$HOME/.cache}/morph-ocr.log"
   mkdir -p "$(dirname "$OCR_LOG")"
-  warm="$(PADDLE_PDX_CACHE_HOME="$OCR_DIR/models" "$OCR_DIR/venv/bin/python" "$APP_DIR/ocr/morph_ocr.py" --warmup 2>>"$OCR_LOG")"
+  warm="$(ocr_run "$OCR_DIR/venv/bin/python" "$APP_DIR/ocr/morph_ocr.py" --warmup 2>>"$OCR_LOG")"
   printf '%s\n' "$warm" >> "$OCR_LOG"
   if ! printf '%s' "$warm" | grep -q '"ok": true'; then
     why="$(printf '%s' "$warm" | sed -n 's/.*"detail": "\([^"]*\)".*/\1/p' | cut -c1-90)"
@@ -316,7 +320,7 @@ do_enable_ocr() {
   exit 0
 }
 do_disable_ocr() {
-  case "$OCR_DIR" in */morph-ocr) rm -rf "$OCR_DIR"; say "Table OCR removed." ;; *) say "Refusing to remove $OCR_DIR"; exit 1 ;; esac
+  case "$OCR_DIR" in */morph-ocr) rm -rf "$OCR_DIR"; rm -f "${XDG_CACHE_HOME:-$HOME/.cache}/morph-ocr.log"; say "Table OCR removed." ;; *) say "Refusing to remove $OCR_DIR"; exit 1 ;; esac
   exit 0
 }
 

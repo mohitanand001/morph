@@ -207,7 +207,14 @@ const ocr = {
       const worker = root.get_child('ocr').get_child('morph_ocr.py').get_path();
       const r = await new Promise((resolve) => {
         try {
-          const p = Gio.Subprocess.new([py, worker, img], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
+          // Same sandbox as the install: models and caches stay in Morph's OCR folder, never in your own ~/.paddlex.
+          const launcher = new Gio.SubprocessLauncher({ flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE });
+          const ocrHome = GLib.build_filenamev([OCR_DIR, 'home']);
+          GLib.mkdir_with_parents(ocrHome, 0o700);
+          launcher.setenv('HOME', ocrHome, true);
+          launcher.setenv('PADDLE_PDX_CACHE_HOME', GLib.build_filenamev([OCR_DIR, 'models']), true);
+          launcher.setenv('PYTHONNOUSERSITE', '1', true);
+          const p = launcher.spawnv([py, worker, img]);
           const timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 150, () => { try { p.force_exit(); } catch (e) { /* done */ } return GLib.SOURCE_REMOVE; });
           p.communicate_utf8_async(null, null, (proc, res) => {
             GLib.source_remove(timer);

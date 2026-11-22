@@ -104,6 +104,14 @@ function desk(opts) {
     check('Keep installing goes back to the progress', /Installing table OCR/.test(blocks()) && !state.cancelled);
     state.installing.onLine('Step 3 of 5: Installing PaddlePaddle, the biggest part (a few minutes)...');
     check('the progress bar follows the installer steps', /"progress":0\.12/.test(blocks()) && /step 3 of 5/.test(blocks()) && /Installing PaddlePaddle/.test(blocks()) && !/Step 3 of 5:/.test(blocks()));
+    {
+      const fs2 = require('fs'), path2 = require('path');
+      const sh = fs2.readFileSync(path2.join(__dirname, '..', 'bin', 'morph'), 'utf8');
+      const gj = fs2.readFileSync(path2.join(__dirname, '..', 'daemon', 'gjs-main.js'), 'utf8');
+      check('OCR is installed into its own Python environment, never the system or user one', /python3 -m venv "\$OCR_DIR\/venv"/.test(sh) && !/--system-site-packages/.test(sh) && !/pip install --user/.test(sh) && /--no-cache-dir/.test(sh));
+      check('OCR runs (warm-up and reads) keep models and caches inside the OCR folder', /HOME="\$OCR_DIR\/home" PADDLE_PDX_CACHE_HOME="\$OCR_DIR\/models" PYTHONNOUSERSITE=1/.test(sh) && /ocr_run "\$OCR_DIR\/venv\/bin\/python"/.test(sh) && /setenv\('HOME', ocrHome/.test(gj) && /setenv\('PADDLE_PDX_CACHE_HOME'/.test(gj) && /setenv\('PYTHONNOUSERSITE'/.test(gj));
+      check('uninstall and Remove delete only Morph\'s OCR folder and log', /rm -rf "\$CACHE\/formatter-icons" "\$OCR_DIR"/.test(sh) && /morph-ocr\.log/.test(sh) && /\*\/morph-ocr\) rm -rf "\$OCR_DIR"/.test(sh) && !/paddlex/.test(sh.replace(/~\/\.paddlex/g, '')));
+    }
     check('the installer prints the five steps', (require('fs').readFileSync(require('path').join(__dirname, '..', 'bin', 'morph'), 'utf8').match(/say "Step \d of 5:/g) || []).length === 5);
     state.installing.onLine('Installing PaddleOCR (this takes a few minutes)...');
     check('the latest progress line is shown', /Installing PaddleOCR/.test(blocks()));
