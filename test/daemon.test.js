@@ -65,7 +65,7 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
     const d = desk({ saved: JSON.stringify({ readFrom: 'listed' }) });
     const c = createCore(d.io);
     await c.start();
-    check('starts hidden when no chosen app is in front', d.last().visible === false);
+    check('the pill stays on screen even when none of your apps is in front', d.last().visible === true);
     c.focus({ app: 'slack', title: 'general - Slack' }, 11);
     check('shows over Slack', d.last().visible === true && d.last().handleColor === '#e01e5a');
     check('before any copy, the apps can\'t be clicked', rowFor(d.last(), 'Jira').off === true && d.last().source.title === 'Nothing copied yet');

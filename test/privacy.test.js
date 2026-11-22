@@ -98,8 +98,18 @@ function desk(saved) {
     const d = desk(JSON.stringify({ setupDone: true, readFrom: 'listed' })); const c = createCore(d.io);
     await c.start();
     c.focus({ app: 'gnome-terminal-server', title: 'bash' }, 23);
+    c.mayRead(); c.mayRead(); c.mayRead();
+    c.focus({ app: 'gjs', title: '' }, 23);
+    c.mayRead();
+    c.focus({ app: 'org.gnome.TextEditor', title: 'notes.txt' }, 23);
     c.mayRead();
     c.action('view:privacy');
+    {
+      const log = JSON.stringify(d.last().pane.blocks[0].items);
+      check('read log: repeats fold into one line, with the app\'s real name', /Skipped 3 copies from Terminal/.test(log) && !/gnome-terminal-server/.test(log), log);
+      check('read log: tidy names for other apps, and nothing about gjs', /Skipped a copy from TextEditor/.test(log) && !/gjs/.test(log), log);
+      check('read log: at most four lines', d.last().pane.blocks[0].items.length <= 4);
+    }
     const pane = d.last().pane;
     const items = JSON.stringify(pane.blocks || []);
     check('Privacy: read log shows the skip, without content', /Skipped a copy from/.test(items) && !/hello/.test(items));

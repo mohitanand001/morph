@@ -153,8 +153,16 @@ function createCore(io) {
   // The formats the pill offers: all of them, or only those of the apps switched on.
   const offeredDests = () => (allApps() ? ALL_DESTS.slice() : ALL_DESTS.filter((d) => setupApps().some((r) => r.enabled && r.dest === d)));
   const logoOf = (r) => (r.id === 'github' || r.id === 'terminal' ? r.id : r.dest);
-  const appLabel = (w) => (currentRule && currentRule.name) || (w && w.app ? String(w.app).replace(/\.desktop$/, '').slice(0, 30) : 'another app');
+  // A name people recognise: the supported app it is (even when switched off), else a tidied app id.
+  const appLabel = (w) => {
+    if (!w) return 'another app';
+    const r = matchRule(settings.rules.map((x) => Object.assign({}, x, { enabled: true })), w);
+    if (r) return r.name;
+    const id = String(w.app || '').replace(/\.desktop$/, '').replace(/^(org|com|io|net)\.[^.]+\./, '').replace(/[-_](server|bin|app)$/i, '').replace(/[-_.]+/g, ' ').trim();
+    return id ? (id.charAt(0).toUpperCase() + id.slice(1)).slice(0, 30) : 'another app';
+  };
   function note(kind, app, chars) {
+    if (winNow && (isSelf(winNow) || /^gjs$/i.test(String(winNow.app || '')))) return; // Morph's own windows
     readLog.push({ at: io.now(), kind, app: String(app || '').slice(0, 30), chars: chars || 0 });
     if (readLog.length > 30) readLog.shift();
   }
@@ -178,7 +186,7 @@ function createCore(io) {
     if (shellVersion < 15) return [];
     if (ocrJob) {
       return [{ kind: 'status', tone: 'plain', icon: 'download', title: 'Installing table OCR…', items: [ocrJob.line || 'Starting…', 'About 1 GB, a few minutes. You can keep using your computer.'] },
-        { kind: 'buttons', buttons: [{ label: 'Cancel', action: 'ocr:cancel', kind: 'secondary' }] }];
+        { kind: 'buttons', buttons: [{ label: 'Stop installing', action: 'ocr:cancel', kind: 'secondary', confirm: { title: 'Stop installing table OCR?', body: 'What was downloaded so far is removed. You can start again later.', ok: 'Stop' } }] }];
     }
     if (ocrReady()) {
       return [{ kind: 'panel', tone: 'ok', icon: 'check_circle', title: 'Table OCR is on', text: 'A copied image is read only when you pick an app, on this device. Nothing is uploaded.' },
@@ -193,6 +201,7 @@ function createCore(io) {
       ocrFail = '';
       ocrJob = { line: 'Starting…', cancelled: false };
       const job = ocrJob;
+      pillView = 'ocr'; flash = { sub: '', tone: 'ok', open: true }; // the confirm dialog closed the pill: bring it back here
       sendPill();
       io.ocr.install((line) => { if (ocrJob === job && line) { job.line = String(line).slice(0, 110); sendPill(); } },
         (ok) => {
@@ -210,13 +219,17 @@ function createCore(io) {
   function readLine(e) {
     const d = new Date(e.at);
     const t = (d.getHours() % 12 || 12) + ':' + String(d.getMinutes()).padStart(2, '0') + (d.getHours() < 12 ? ' AM' : ' PM');
-    return t + ' · ' + (e.kind === 'ocr' ? 'Read a table from an image, on this device' : e.kind === 'skipped' ? 'Skipped a copy from ' + e.app : 'Read ' + e.chars + ' characters from ' + (e.app || 'an app'));
+    const n = e.n || 1, many = n > 1 ? n + ' copies' : 'a copy';
+    const from = e.app || 'an app';
+    if (e.kind === 'ocr') return t + ' · Read ' + (n > 1 ? n + ' tables from images' : 'a table from an image') + ', on this device';
+    if (e.kind === 'skipped') return t + ' · Skipped ' + many + ' from ' + from;
+    return t + ' · Read ' + (n > 1 ? many : e.chars + ' characters') + ' from ' + from;
   }
 
   // ---------------------------------------------------------------- pill spec
   const pillShouldShow = () => {
     if (!settings.pillEnabled) return false;
-    if (allApps()) return true;
+    return true; // always there: a pill that comes and goes looks broken
     if (shellStatus === 'unavailable') return true;
     return !!currentRule;
   };
@@ -258,7 +271,7 @@ function createCore(io) {
     const sw = (on) => (on ? 'on' : 'off');
     if (cur === 'edit') {
       const on = allApps();
-      spec.pane = { title: 'Apps', lede: on ? APP_NAME + ' reads copies from any app, except password managers, and converts for all of these.' : APP_NAME + ' reads copies only from the apps switched on below, and converts only for them.',
+      spec.pane = { title: 'Apps', lede: 'Where ' + APP_NAME + ' reads and converts your copies.',
         opts: [{ icon: 'grid_view', label: 'All apps', sub: on ? 'On: every app, except password managers' : 'Off: only the apps switched on below', sw: sw(on), action: 'toggle:readfrom' }] };
       if (on) spec.pane.blocks = [{ kind: 'panel', tone: 'plain', title: 'Converts for', items: [setupApps().map((r) => r.name).join(', ')] }];
       else spec.pane.apps = setupApps().map((r) => ({ label: r.name, dest: logoOf(r), sw: r.enabled ? 'on' : 'off', action: 'rule:' + r.id, up: '', down: '' }));
@@ -270,7 +283,13 @@ function createCore(io) {
       spec.pane = { title: 'Shortcuts', lede: 'Click a shortcut to turn it on or off.',
         keys: shortcutsForSettings().map((k, i) => ({ label: KEY_SHORT[k.id] || k.name, icon: KEY_ICON[k.id] || 'keyboard', keys: k.label.split(' ').filter(Boolean).slice(0, 5), sw: sw(k.on && !k.taken), note: k.taken ? 'Taken by another app' : '', action: 'key:' + i })) };
     } else if (cur === 'privacy') {
-      const recent = readLog.slice(-8).reverse().map(readLine);
+      // Repeats fold into one line ("Skipped 5 copies from Terminal"); only the last few show.
+      const groups = [];
+      readLog.slice().reverse().forEach((e) => {
+        const g = groups[groups.length - 1];
+        if (g && g.kind === e.kind && g.app === e.app) { g.n++; g.chars += e.chars || 0; } else groups.push({ at: e.at, kind: e.kind, app: e.app, chars: e.chars || 0, n: 1 });
+      });
+      const recent = groups.slice(0, 4).map(readLine);
       spec.pane = { title: 'Privacy', lede: APP_NAME + ' never stores or sends what you copy.',
         actions: [{ icon: 'grid_view', label: 'Which apps ' + APP_NAME + ' reads from', sub: allApps() ? 'All apps, except password managers. Change it in Apps' : setupApps().filter((r) => r.enabled).length + ' apps. Change them in Apps', action: 'view:edit' }] };
       if (shellVersion >= 13) spec.pane.blocks = [
@@ -334,10 +353,10 @@ function createCore(io) {
     } else {
       spec.pane = { title: 'General', lede: 'How ' + APP_NAME + ' behaves when you copy.',
         opts: [
-          { icon: 'bolt', label: 'Convert automatically', sub: 'Fix copies when you switch apps', sw: sw(settings.autoFormat), action: 'toggle:auto' },
-          { icon: 'link', label: 'Keep the source link', sub: 'Add a link back to where it came from', sw: sw(settings.linkBack), action: 'toggle:link' },
-          { icon: 'public', label: 'Show links in copies', sub: 'URLs, tickets and emails you can click to open', sw: sw(settings.crossLinks), action: 'toggle:crosslinks' },
-          { icon: 'grid_view', label: 'App icons on the tab', sub: 'Convert with one click, without opening it', sw: sw(settings.tabIcons), action: 'toggle:tabicons' },
+          { icon: 'bolt', label: 'Convert automatically', sub: 'Converts a copy when you switch to one of your apps', sw: sw(settings.autoFormat), action: 'toggle:auto' },
+          { icon: 'link', label: 'Say where it came from', sub: 'Ends the paste with a line like “Source: Slack · #general”', sw: sw(settings.linkBack), action: 'toggle:link' },
+          { icon: 'public', label: 'Links from your copy', sub: 'The pill lists links, tickets and emails it finds, to open in one click', sw: sw(settings.crossLinks), action: 'toggle:crosslinks' },
+          { icon: 'grid_view', label: 'Quick buttons on the tab', sub: 'App buttons on the closed pill: one click converts', sw: sw(settings.tabIcons), action: 'toggle:tabicons' },
         ] };
       if (shellVersion < 12) {
         // An older helper only draws switches: keep the old two-click rows until it is updated.

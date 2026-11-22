@@ -93,7 +93,8 @@ function desk(opts) {
     const blocks = () => JSON.stringify(d.last().pane.blocks);
     check('off: the pane offers an Enable table OCR button with a confirmation', /Enable table OCR/.test(blocks()) && /1 GB/.test(blocks()) && /ocr:on/.test(blocks()));
     c.action('ocr:on');
-    check('installing: progress is shown, with Cancel', /Installing table OCR/.test(blocks()) && /Cancel/.test(blocks()) && !/Enable table OCR/.test(blocks()));
+    check('installing: progress is shown, with Stop installing (which asks first)', /Installing table OCR/.test(blocks()) && /Stop installing/.test(blocks()) && /Stop installing table OCR\?/.test(blocks()) && !/Enable table OCR/.test(blocks()));
+    check('installing: the pill reopens on this page after the confirm dialog', d.pills.some((x) => x.openNow === true && x.pane && x.pane.title === 'Image tables'));
     state.installing.onLine('Installing PaddleOCR (this takes a few minutes)...');
     check('the latest progress line is shown', /Installing PaddleOCR/.test(blocks()));
     c.action('ocr:on');

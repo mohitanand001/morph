@@ -43,7 +43,7 @@ import { Slider } from 'resource:///org/gnome/shell/ui/slider.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const PILL_VERSION = 23;
+const PILL_VERSION = 24;
 const IFACE = `
 <node>
   <interface name="dev.morph.Focus">
@@ -1067,7 +1067,7 @@ export default class FormatBridgeHelper extends Extension {
   _setRow(cls, o, right) {
     const b = new St.Button({ style_class: cls, can_focus: false, reactive: true, track_hover: true, x_expand: true });
     const box = new St.BoxLayout({ style_class: 'fb-opt-box', x_expand: true });
-    box.add_child(this._tile('fb-oi', str(o.icon, 24), '#137b72', 19));
+    box.add_child(o.dest ? this._chipDot(o) : this._tile('fb-oi', str(o.icon, 24), '#137b72', 19)); // an app row shows the app's logo
     const t = vbox({ x_expand: true, y_align: Clutter.ActorAlign.CENTER });
     t.add_child(this._lbl('fb-ot-b', o.label, 80, true));
     if (o.sub) t.add_child(this._lbl('fb-ot-s', o.sub, 200, true));
@@ -1459,7 +1459,11 @@ export default class FormatBridgeHelper extends Extension {
       (Array.isArray(k.keys) ? k.keys : []).slice(0, 5).forEach((x) => keys.add_child(new St.Label({ style_class: 'fb-kbd', text: str(x, 8), y_align: Clutter.ActorAlign.CENTER })));
       pane.add_child(sep(this._setRow('fb-opt', { icon: k.icon, label: k.label, note: k.note, action: k.action, under: keys }, [this._toggle(k.sw === 'on')])));
     });
-    if (Array.isArray(p.apps)) {
+    if (Array.isArray(p.apps) && p.appsFixed) {
+      // A plain list of apps with switches, drawn like the other settings rows.
+      p.apps.slice(0, 14).filter((x) => x && typeof x === 'object')
+        .forEach((x) => pane.add_child(sep(this._setRow('fb-opt', { dest: x.dest, label: x.label, action: x.action }, [this._toggle(x.sw === 'on')]))));
+    } else if (Array.isArray(p.apps)) {
       const apps = p.apps.slice(0, 14).filter((x) => x && typeof x === 'object');
       const on = apps.filter((x) => x.sw === 'on');
       const off = apps.filter((x) => x.sw !== 'on');
