@@ -130,9 +130,9 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
     c.action('fix:jira'); await settle();
     check('nothing is written for an image', d.writes.length === 0);
   }
-  // --- paste shortcut
+  // --- paste shortcut (auto-convert off, so only the shortcut writes)
   {
-    const d = desk();
+    const d = desk({ saved: JSON.stringify({ autoFormat: false }) });
     const c = createCore(d.io);
     await c.start();
     c.focus({ app: 'gnome-terminal-server', title: 'Terminal' }, 11);
@@ -156,16 +156,30 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
     const d = desk();
     const c = createCore(d.io);
     await c.start();
+    c.focus({ app: 'firefox', title: 'Something' }, 30);
+    check('auto-format is on for a new install, and the welcome card says so', JSON.parse(d.saved || '{}').autoFormat !== false && d.pills.some((p) => p.setup && /converts your copy when you switch/.test(p.setup.foot)));
     c.focus({ app: 'firefox', title: 'Something' }, 11);
     d.copy({ text: fx.text, html: fx.html });
     await c.clipboardChanged();
-    c.action('toggle:auto');
     c.focus({ app: 'slack', title: 'x - Slack' }, 11);
     await settle();
     check('auto-format converts when you arrive in one of your apps', d.writes.length === 1, String(d.writes.length));
     c.focus({ app: 'slack', title: 'y - Slack' }, 11);
     await settle();
     check('auto-format does not run twice for the same app', d.writes.length === 1);
+    c.action('toggle:auto');
+    c.focus({ app: 'firefox', title: 'Something' }, 11);
+    d.copy({ text: fx.text + ' again', html: fx.html });
+    await c.clipboardChanged();
+    c.focus({ app: 'jira', title: 'x - Jira' }, 11);
+    await settle();
+    check('switched off, nothing is converted on arrival', d.writes.length === 1);
+  }
+  {
+    const d = desk({ saved: JSON.stringify({ autoFormat: false, setupDone: true }) });
+    const c = createCore(d.io);
+    await c.start();
+    check('an install that had auto-format off keeps it off', JSON.parse(d.saved || JSON.stringify({ autoFormat: false })).autoFormat === false);
   }
   // --- settings, persistence, hiding
   {

@@ -61,7 +61,7 @@ function desk(saved) {
   }
   {
     // Settings → Apps: one list, two ways.
-    const d = desk(JSON.stringify({ setupDone: true })); const c = createCore(d.io);
+    const d = desk(JSON.stringify({ setupDone: true, autoFormat: false })); const c = createCore(d.io);
     await c.start();
     c.focus({ app: 'slack', title: 'x - Slack' }, 23);
     c.action('view:edit');
@@ -98,7 +98,7 @@ function desk(saved) {
   }
   {
     // Privacy page: the read log and what is never read. Which apps lives on the Apps page only.
-    const d = desk(JSON.stringify({ setupDone: true, readFrom: 'listed' })); const c = createCore(d.io);
+    const d = desk(JSON.stringify({ setupDone: true, readFrom: 'listed', autoFormat: false })); const c = createCore(d.io);
     await c.start();
     c.focus({ app: 'gnome-terminal-server', title: 'bash' }, 23);
     c.mayRead(); c.mayRead(); c.mayRead();
@@ -123,7 +123,7 @@ function desk(saved) {
     check('Image tables page shows the OCR controls', d.last().pane.title === 'Image tables' && /Turn on image tables|Image tables/.test(JSON.stringify(d.last().pane.blocks)));
   }
   {
-    const d = desk(JSON.stringify({ setupDone: true, readFrom: 'listed' })); const c = createCore(d.io);
+    const d = desk(JSON.stringify({ setupDone: true, readFrom: 'listed', autoFormat: false })); const c = createCore(d.io);
     await c.start();
     check('only-these-apps mode never reads at start', d.reads === 0);
   }

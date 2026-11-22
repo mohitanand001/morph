@@ -26,7 +26,7 @@ const { createCore } = require(path.join(app, 'daemon/core.js'));
 const { pdfItems } = require(path.join(app, 'daemon/pdf-doc.js'));
 const writes = []; const pills = [];
 const core = createCore({
-  version: '0', home: '/h', store: { read: () => null, write() {} },
+  version: '0', home: '/h', store: { read: () => '{"autoFormat":false}', write() {} },
   shell: { setPill: (s) => pills.push(s), readClip: async () => ({ formats: ['text/plain'], secret: false, text: '# Hi\n\n| a | b |\n|---|---|\n| 1 | 2 |', html: '' }), writeClip: async (m, d) => { writes.push([m, d]); return true; }, paste() {}, setShortcuts: async () => [] },
   notify() {}, savePdf: async () => ({ ok: true, name: 'a.pdf', path: '/h/a.pdf' }), openPath() {}, openUri() {}, showInFolder() {},
   now: () => Date.now(), setTimeout: (fn, ms) => setTimeout(fn, ms), clearTimeout,

@@ -26,6 +26,7 @@ You can read the installer first: [`site/install.sh`](site/install.sh).
 - **Destination-aware copy**: each destination gets the format it understands. Pairs that already paste fine (Slack to Slack, Jira to Confluence) get your copy back untouched.
 - **Lists and indentation**: odd bullets, `a) b)` numbering, mixed tabs and spaces and Outlook's fake lists become real nested lists.
 - **Terminal output** and **PDF text** are cleaned up too.
+- **Converts as you arrive**: switch to one of Morph's apps and your copy is already converted, so plain Ctrl+V pastes it right. On by default; turn it off in Settings → General.
 - **A slim tab** on the screen edge opens Morph, which shows what you copied and offers the apps to convert it for. The app you're in is at the top; click an app, then paste with Ctrl+V. The ✕ closes it back into the tab.
 - **Image tables (optional)**: reads a table from a copied screenshot, on your computer, only when you click. Turn it on in Settings → Image tables (about 400 MB, using RapidOCR).
 

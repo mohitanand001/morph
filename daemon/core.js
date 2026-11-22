@@ -69,7 +69,7 @@ const norm = (t) => String(t == null ? '' : t).replace(/\r\n/g, '\n').replace(/\
 function createCore(io) {
   const FB = globalThis.FB;
   const log = io.log || (() => {});
-  const SETTINGS_DEFAULT = { rules: DEFAULT_RULES, pillEnabled: true, pillMode: 'always', pillYFrac: 0.42, pillSide: 'r', pillMonitor: -1, autoFormat: false, linkBack: false, crossLinks: true, tabIcons: false, theme: 'sol-light', size: 'm', shortcuts: null, pillDests: null, atlassianSite: '', seenDefaults: null, people: {}, updateCheck: true, readFrom: 'any', setupDone: false, appOrder: null, lastCheck: 0, lastOk: 0, notifiedVersion: '' };
+  const SETTINGS_DEFAULT = { rules: DEFAULT_RULES, pillEnabled: true, pillMode: 'always', pillYFrac: 0.42, pillSide: 'r', pillMonitor: -1, autoFormat: true, linkBack: false, crossLinks: true, tabIcons: false, theme: 'sol-light', size: 'm', shortcuts: null, pillDests: null, atlassianSite: '', seenDefaults: null, people: {}, updateCheck: true, readFrom: 'any', setupDone: false, appOrder: null, lastCheck: 0, lastOk: 0, notifiedVersion: '' };
   let settings = Object.assign({}, SETTINGS_DEFAULT);
 
   let currentRule = null;
@@ -517,7 +517,7 @@ function createCore(io) {
       spec.setup = { welcome: true, title: APP_NAME + ' is ready',
         body: [allApps() ? APP_NAME + ' reads what you copy in any app, except password managers, and converts it for these tools:' : APP_NAME + ' reads what you copy in these apps and converts it for them:'],
         apps: (allApps() ? setupApps() : setupApps().filter((r) => r.enabled)).map((r) => ({ name: r.name, logo: logoOf(r) })),
-        foot: 'What you copy never leaves this computer. To choose which apps ' + APP_NAME + ' reads from, open Settings → Apps. ' + APP_NAME + ' checks for updates once a day; you can turn that off in Settings → Updates.',
+        foot: (settings.autoFormat ? APP_NAME + ' converts your copy when you switch to one of these apps; turn that off in Settings → General. ' : '') + 'What you copy never leaves this computer. To choose which apps ' + APP_NAME + ' reads from, open Settings → Apps. ' + APP_NAME + ' checks for updates once a day; you can turn that off in Settings → Updates.',
         ok: 'Got it', settings: 'Open Settings' };
     }
     flash = null;
