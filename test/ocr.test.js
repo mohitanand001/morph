@@ -102,6 +102,9 @@ function desk(opts) {
     check('Stop installing asks first, in the pill', /Stop installing\?/.test(blocks()) && /Keep installing/.test(blocks()));
     c.action('ocr:no');
     check('Keep installing goes back to the progress', /Installing table OCR/.test(blocks()) && !state.cancelled);
+    state.installing.onLine('Step 3 of 5: Installing PaddlePaddle, the biggest part (a few minutes)...');
+    check('the progress bar follows the installer steps', /"progress":0\.12/.test(blocks()) && /step 3 of 5/.test(blocks()) && /Installing PaddlePaddle/.test(blocks()) && !/Step 3 of 5:/.test(blocks()));
+    check('the installer prints the five steps', (require('fs').readFileSync(require('path').join(__dirname, '..', 'bin', 'morph'), 'utf8').match(/say "Step \d of 5:/g) || []).length === 5);
     state.installing.onLine('Installing PaddleOCR (this takes a few minutes)...');
     check('the latest progress line is shown', /Installing PaddleOCR/.test(blocks()));
     c.action('ocr:on');

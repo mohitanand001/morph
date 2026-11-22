@@ -43,7 +43,7 @@ import { Slider } from 'resource:///org/gnome/shell/ui/slider.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const PILL_VERSION = 25;
+const PILL_VERSION = 26;
 const IFACE = `
 <node>
   <interface name="dev.morph.Focus">
@@ -1021,12 +1021,13 @@ export default class FormatBridgeHelper extends Extension {
     const nm = this._lbl('fb-app-name', a.label, 30);
     nm.x_expand = true;
     box.add_child(nm);
-    if (a.sw !== 'none') {
-      const t = new St.Button({ style_class: 'fb-swbtn', can_focus: false, reactive: true, track_hover: true, y_align: Clutter.ActorAlign.CENTER });
-      t.set_child(this._toggle(a.sw === 'on'));
-      t.connect('clicked', () => this._send(a.action));
-      box.add_child(t);
-    }
+    if (a.sw === 'none') r.opacity = 110; // part of "All apps": shown, but there is nothing to switch here
+    // The switch is always laid out (invisible when there is nothing to switch), so rows keep one height.
+    const t = new St.Button({ style_class: 'fb-swbtn', can_focus: false, reactive: a.sw !== 'none', track_hover: true, y_align: Clutter.ActorAlign.CENTER });
+    t.set_child(this._toggle(a.sw === 'on'));
+    if (a.sw === 'none') t.opacity = 0;
+    else t.connect('clicked', () => this._send(a.action));
+    box.add_child(t);
     r.add_child(box);
     if (drag) {
       r.connect('button-press-event', (_x, e) => {
@@ -1061,6 +1062,13 @@ export default class FormatBridgeHelper extends Extension {
     head.add_child(this._lbl('fb-blk-title', b.title, 80, true));
     card.add_child(head);
     if (b.text) card.add_child(this._lbl('fb-blk-text', b.text, 320, true));
+    if (typeof b.progress === 'number' && b.progress >= 0) {
+      const bar = new St.BoxLayout({ style_class: 'fb-prog', x_expand: true });
+      try { bar.layout_manager.homogeneous = true; } catch (e) { /* fine */ }
+      const n = 24, lit = Math.max(1, Math.round(Math.min(1, b.progress) * n));
+      for (let i = 0; i < n; i++) bar.add_child(new St.Widget({ style_class: 'fb-prog-seg' + (i < lit ? ' fb-on' : ''), x_expand: true }));
+      card.add_child(bar);
+    }
     (Array.isArray(b.items) ? b.items : []).slice(0, 8).forEach((x) => card.add_child(this._lbl('fb-blk-text fb-blk-item', b.kind === 'status' ? x : '\u2022  ' + x, 120, true)));
     if (b.button && typeof b.button === 'object') card.add_child(this._blockButton(b.button));
     return card;
@@ -1467,13 +1475,14 @@ export default class FormatBridgeHelper extends Extension {
         .forEach((x) => pane.add_child(sep(this._setRow('fb-opt', { dest: x.dest, label: x.label, action: x.action }, [this._toggle(x.sw === 'on')]))));
     } else if (Array.isArray(p.apps)) {
       const apps = p.apps.slice(0, 14).filter((x) => x && typeof x === 'object');
-      const on = apps.filter((x) => x.sw !== 'off');
-      const off = apps.filter((x) => x.sw === 'off');
+      // keepOrder: every row stays where it is (off rows are not moved to a separate list).
+      const on = p.keepOrder ? apps : apps.filter((x) => x.sw !== 'off');
+      const off = p.keepOrder ? [] : apps.filter((x) => x.sw === 'off');
       // Shown apps: press and drag a row to move it (others slide to make room).
       this._editList = vbox({ style_class: 'fb-applist', x_expand: true });
       this._editRows = [];
       this._editItems = on;
-      this._editChips = on.map((x, i) => this._appRow(x, i, !p.appsFixed));
+      this._editChips = on.map((x, i) => this._appRow(x, i, !p.appsFixed && x.sw !== 'none'));
       this._editOrder = on.map((_x, i) => i);
       this._editLayout();
       pane.add_child(this._editList);

@@ -135,9 +135,12 @@
 .fb-ot-warn { font-size: 11px; font-weight: 600; color: #946e00; }
 .fb-keys { spacing: 3px; margin-top: 3px; }
 .fb-kbd { font-size: 10.5px; font-weight: 600; color: #5c6f72; background-color: #fbf6e8; border: 1px solid #d9cfb0; border-radius: 5px; padding: 1px 6px; }
-.fb-applist { spacing: 0; }
-.fb-app-row { padding: 7px 8px; border: 0; border-bottom: 1px solid #ece4cb; border-radius: 0; background-color: transparent; }
-.fb-app-row:hover { background-color: #f8f1dd; border-radius: 8px; }
+.fb-applist { spacing: 4px; }
+.fb-app-row { padding: 5px 8px; border: 1px solid #e7ddc0; border-radius: 10px; background-color: #fdf6e3; }
+.fb-app-row:hover { border-color: #ddd3b4; background-color: #f8f1dd; }
+.fb-prog { spacing: 2px; margin: 8px 0 4px 0; }
+.fb-prog-seg { height: 6px; border-radius: 3px; background-color: #e7ddc0; }
+.fb-prog-seg.fb-on { background-color: #2aa198; }
 .fb-app-box { spacing: 8px; }
 .fb-app-name { font-size: 12.5px; font-weight: 500; color: #0a3a45; }
 .fb-app-row.fb-off .fb-app-name { color: #93a1a1; }

@@ -202,7 +202,7 @@ function createCore(io) {
       { kind: 'buttons', buttons: [{ label: yes, action: yesAction, kind: 'primary' }, { label: no, action: 'ocr:no', kind: 'secondary' }] }];
     if (ocrJob) {
       if (ocrAsk === 'stop') return ask('Stop installing?', 'What was downloaded so far is removed. You can start again later.', 'Stop', 'ocr:cancel', 'Keep installing');
-      return [{ kind: 'status', tone: 'plain', icon: 'download', title: 'Installing table OCR…', items: [ocrJob.line || 'Starting…', 'About 1 GB, a few minutes. You can keep using your computer.'] },
+      return [{ kind: 'status', tone: 'plain', icon: 'download', title: 'Installing table OCR' + (ocrJob.step ? ' · step ' + ocrJob.step : '…'), progress: ocrJob.progress || 0.02, items: [ocrJob.line || 'Starting…', 'About 1 GB, a few minutes. You can keep using your computer.'] },
         { kind: 'buttons', buttons: [{ label: 'Stop installing', action: 'ocr:askstop', kind: 'secondary' }] }];
     }
     if (ocrReady()) {
@@ -224,7 +224,13 @@ function createCore(io) {
       ocrJob = { line: 'Starting…', cancelled: false };
       const job = ocrJob;
       sendPill();
-      io.ocr.install((line) => { if (ocrJob === job && line) { job.line = String(line).slice(0, 110); sendPill(); } },
+      io.ocr.install((line) => {
+        if (ocrJob !== job || !line) return;
+        const m = /Step (\d) of (\d)/.exec(line);
+        if (m) { const at = [0, 0.05, 0.12, 0.65, 0.85][Number(m[1]) - 1]; job.progress = typeof at === 'number' ? at : job.progress; job.step = m[1] + ' of ' + m[2]; }
+        job.line = String(line).replace(/^Step \d of \d:\s*/, '').slice(0, 110);
+        sendPill();
+      },
         (ok) => {
           if (ocrJob === job) ocrJob = null;
           if (!ok) ocrFail = job.cancelled ? 'Cancelled. Nothing was kept.' : (job.line && job.line !== 'Starting…' ? job.line : 'The install did not finish.');
@@ -293,9 +299,9 @@ function createCore(io) {
     if (cur === 'edit') {
       const on = allApps();
       spec.pane = { title: 'Apps', lede: 'Where ' + APP_NAME + ' works. Drag to reorder.',
-        opts: [{ icon: 'grid_view', label: 'All apps', sub: on ? 'On: every app, except password managers' : 'Off: only the apps switched on below', sw: sw(on), action: 'toggle:readfrom' }],
+        opts: [{ icon: 'grid_view', label: 'All apps', sub: 'Every app, except password managers', sw: sw(on), action: 'toggle:readfrom' }],
         apps: setupApps().map((r) => ({ label: r.name, dest: logoOf(r), sw: on ? 'none' : (r.enabled ? 'on' : 'off'), action: on ? '' : 'rule:' + r.id })),
-        offLabel: 'Off' };
+        keepOrder: true };
     } else if (cur === 'keys') {
       const KEY_SHORT = { paste: 'Paste, fixed', plain: 'Paste as plain text', pill: 'Open the pill', auto: 'Auto-format on/off', pdf: 'Save as PDF' };
       const KEY_ICON = { paste: 'content_paste', plain: 'notes', pill: 'grid_view', auto: 'bolt', pdf: 'description' };
@@ -373,7 +379,7 @@ function createCore(io) {
       spec.pane = { title: 'General', lede: 'How ' + APP_NAME + ' behaves when you copy.',
         opts: [
           { icon: 'bolt', label: 'Convert automatically', sub: 'Converts a copy when you switch to one of your apps', sw: sw(settings.autoFormat), action: 'toggle:auto' },
-          { icon: 'link', label: 'Say where it came from', sub: 'Ends the paste with a line like “Source: Slack · #general”', sw: sw(settings.linkBack), action: 'toggle:link' },
+          { icon: 'grid_view', label: 'Quick buttons on the tab', sub: 'App buttons on the closed pill: one click converts', sw: sw(settings.tabIcons), action: 'toggle:tabicons' },
         ] };
       if (shellVersion < 12) {
         // An older helper only draws switches: keep the old two-click rows until it is updated.
@@ -446,7 +452,6 @@ function createCore(io) {
     spec.section = rule ? 'Copy for another app' : 'Copy it for';
     spec.options = rows;
     if (copy) {
-      spec.original = tickDest === 'original' ? { label: 'Original', done: true } : { label: 'Original', hint: 'as copied', action: 'orig:', busy: 'Restoring…' };
       if (rule && settings.linkBack && place && copyWin && copyWin.rule && copyWin.rule.id !== rule.id && rule.dest !== 'text') {
         spec.note = 'Adds “Source: ' + place.tool + ' · ' + place.where + '”';
       }
@@ -717,7 +722,7 @@ function createCore(io) {
     sendPill();
   }
   function onSettingsAction(kind, arg) {
-    const list0 = () => shownApps().map((r) => r.id);
+    const list0 = () => setupApps().map((r) => r.id);
     const commit = (list) => {
       const shown = list0();
       if (list.length !== shown.length || !list.every((id) => shown.includes(id))) { sendPill(); return; }

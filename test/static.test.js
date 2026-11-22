@@ -133,7 +133,7 @@ check('package ships lib, pill preload and nothing else new', pkg.build.files.in
   const pjs = read('src/pill.js');
   const own = [...css.matchAll(/(^|\n)([^{}\n]*\.fb-echip)\s*\{([^}]*)\}/g)].filter((m) => /\b(padding|border-radius|font-size)\s*:/.test(m[3])).map((m) => m[2].trim());
   check('GNOME edit chips are option chips (class + inner row), no size rules of their own', /style_class: 'fb-option fb-echip'/.test(extJs) && /style_class: 'fb-btn-row'/.test(extJs.slice(extJs.indexOf('_editChip(it, ci)'), extJs.indexOf('_fillEdit('))) && own.length === 0, own.join(' | '));
-  check('apps can be switched on and off from the pill (a fixed list when the core asks for one)', /kind === 'dput'/.test(main) && /'dput:'/.test(pjs) && /'dput:'/.test(extJs) && /_appRow\(x, i, !p\.appsFixed\)/.test(extJs));
+  check('apps can be switched on and off from the pill (a fixed list when the core asks for one)', /kind === 'dput'/.test(main) && /'dput:'/.test(pjs) && /'dput:'/.test(extJs) && /_appRow\(x, i, !p\.appsFixed && x\.sw !== 'none'\)/.test(extJs));
   check('title bar like the design: logo, Morph, gear, minimize, close (both pills)', /'fb-gear', 'settings'/.test(extJs) && /'fb-logo', 'content_paste'/.test(extJs) && /iconBtn\('gear', 'settings'/.test(pjs) && /glyph\('content_paste', 'logo'\)/.test(pjs));
   check('the middle of the pill scrolls and the footer stays (both pills)', /St\.ScrollView/.test(extJs.slice(extJs.indexOf('this._body = vbox'))) && /el\('div', 'body'\)/.test(pjs) && /\.body \{[^}]*overflow-y: auto/.test(pcss));
 }

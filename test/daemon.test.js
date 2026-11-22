@@ -105,7 +105,7 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
     await settle();
     check('Undo says the original is back on the clipboard', /original is back on the clipboard/i.test(d.last().sub || ''), JSON.stringify(d.last().sub));
     check('Original puts back what was copied', d.writes[d.writes.length - 1].data === fx.html || d.writes[d.writes.length - 1].data === fx.text);
-    check('Original row shows the tick', d.last().original && d.last().original.done === true);
+    check('there is one way back (Undo on the card), no separate Original row', !d.last().original);
     d.advance(1600);
     check('after Undo the button is gone again', !d.last().secondary);
 

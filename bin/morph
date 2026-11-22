@@ -289,11 +289,16 @@ do_enable_ocr() {
   say "Table OCR installs PaddleOCR into $OCR_DIR (about 1 GB, one time, needs internet)."
   say "Nothing is sent anywhere when you use it. Remove it any time with:  morph --disable-ocr"
   mkdir -p "$OCR_DIR"
-  [ -x "$OCR_DIR/venv/bin/python" ] || python3 -m venv "$OCR_DIR/venv" || { say "Could not create the Python environment."; exit 1; }
+  # "Step n of 5" lines drive the progress bar in Settings → Image tables.
+  say "Step 1 of 5: Preparing a private Python environment..."
+  [ -x "$OCR_DIR/venv/bin/python" ] || python3 -m venv "$OCR_DIR/venv" || { say "Could not create the Python environment."; rm -rf "$OCR_DIR"; exit 1; }
+  say "Step 2 of 5: Updating the Python installer..."
   "$OCR_DIR/venv/bin/python" -m pip install --quiet --upgrade pip || true
-  say "Installing PaddleOCR (this takes a few minutes)..."
-  "$OCR_DIR/venv/bin/python" -m pip install --quiet "paddlepaddle>=3.0,<4" "paddleocr>=3.0,<4" || { say "The install failed. Nothing was changed in Morph."; rm -rf "$OCR_DIR"; exit 1; }
-  say "Downloading the table models (one time)..."
+  say "Step 3 of 5: Installing PaddlePaddle, the biggest part (a few minutes)..."
+  "$OCR_DIR/venv/bin/python" -m pip install --quiet "paddlepaddle>=3.0,<4" || { say "The install failed. Nothing was changed in Morph."; rm -rf "$OCR_DIR"; exit 1; }
+  say "Step 4 of 5: Installing PaddleOCR..."
+  "$OCR_DIR/venv/bin/python" -m pip install --quiet "paddleocr>=3.0,<4" || { say "The install failed. Nothing was changed in Morph."; rm -rf "$OCR_DIR"; exit 1; }
+  say "Step 5 of 5: Downloading the table models (one time)..."
   PADDLE_PDX_CACHE_HOME="$OCR_DIR/models" "$OCR_DIR/venv/bin/python" "$APP_DIR/ocr/morph_ocr.py" --warmup | grep -q '"ok": true' || { say "Could not load the models. Run this again when you are online."; rm -rf "$OCR_DIR"; exit 1; }
   : > "$OCR_DIR/ready"
   say "Table OCR is on. Copy a screenshot of a table, then click an app in the pill."
