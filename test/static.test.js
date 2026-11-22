@@ -201,7 +201,7 @@ check('hover label for the tab icons: opens away from the edge, after a pause, t
 check('the tab is sized from pinned icon sizes (never measured)', /icon-size: 14px/.test(extJs) && !/_tabBox\.get_preferred_height/.test(extJs));
 check('Small caps the list and scrolls (both renderers)', /'fb-size-s': 250/.test(extJs) && /s: 250, m: 330, l: 420/.test(read('src/pill.js')));
 check('every copy gets its scribble (a counter, not just a changed description) in both renderers', /copySeq\+\+/.test(read('main.js')) && /copyId: copy \? copySeq : 0/.test(read('main.js')) && /s\.copyId/.test(extJs) && /s\.copyId/.test(read('src/pill.js')));
-check('the clipboard on the tab has a hover label ("All apps")', /_tipWire\(this\._tabHit, 'All apps'\)/.test(extJs));
+check('the clipboard on the tab has a hover label ("Open Morph")', /_tipWire\(this\._tabHit, 'Open Morph'\)/.test(extJs));
 check('the main list keeps its scroll too (both renderers, restored before first paint)', /_scrollPane = 'main'/.test(extJs) && /_restoreScroll\(/.test(extJs) && /notify::upper/.test(extJs) && /mainY/.test(read('src/pill.js')));
 check('an open panel keeps its top edge (no re-centring jump) and opening does no second rebuild', /_openTop/.test(extJs) && !/kind === 'opened'/.test(read('main.js')) );
 check('quick rebuilds in a row keep the scroll; clipboard write check no longer blocks the click', /_restoreUntil/.test(extJs) && /verifyWrite\(html, text\)\.catch/.test(read('main.js')));

@@ -174,7 +174,7 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
     await c.start();
     c.focus({ app: 'slack', title: 'x - Slack' }, 11);
     c.action('view:settings');
-    check('settings page opens', d.last().view === 'settings' && d.last().nav.length === 6);
+    check('settings page opens', d.last().view === 'settings' && d.last().nav.length === 5 && d.last().pane.cards.length === 3);
     c.action('toggle:link');
     check('a switch flips and is saved', JSON.parse(d.saved).linkBack === true);
     c.action('view:edit');
@@ -314,6 +314,27 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
     await c.clipboardChanged({ text: 'Visit https://example.com', html: '' });
     await settle();
     check('cross-links: none when setting is off', d.last().links.length === 0);
+  }
+  // --- pressing a button never moves anything else: the same rows, in the same order, and the same footer slot
+  {
+    const d = desk({ saved: JSON.stringify({ readFrom: 'listed' }) });
+    const c = createCore(d.io);
+    await c.start();
+    c.focus({ app: 'slack', title: 'general - Slack' }, 30);
+    const shape = (s) => JSON.stringify({ p: !!s.primary, rows: flat(s).map((o) => o.label + (o.done ? '' : '')).filter((l) => l !== 'Jira'), n: flat(s).length, foot: (s.footer || []).length, note: !!s.note, card: !!s.source });
+    const before = d.last();
+    check('current helper: the app you are in has its own row, and PDF is in the footer slot, not the list', before.primary && before.primary.label === 'Slack' && before.primary.hint === 'This app' && !flat(before).some((o) => /PDF/.test(o.label)) && before.footer.length === 1 && before.footer[0].off);
+    d.copy({ text: fx.text, html: fx.html });
+    await c.clipboardChanged();
+    const copied = d.last();
+    check('a copy keeps the same rows and slots', shape(copied) === shape(before), shape(before) + ' vs ' + shape(copied));
+    c.action('fix:jira'); await settle();
+    const fixed = d.last();
+    check('converting keeps the same rows and slots', flat(fixed).length === flat(copied).length && fixed.footer.length === 1 && !!fixed.primary);
+    d.io.savePdf = async () => ({ ok: true, name: 'Report.pdf', path: '/home/t/Downloads/Report.pdf' });
+    c.action('pdf:'); await settle();
+    const saved = d.last();
+    check('saving a PDF swaps the footer slot only (Open / Show in folder), nothing is added', flat(saved).length === flat(copied).length && saved.footer.length === 2 && saved.footer[0].action === 'openpdf:' && !!saved.primary, JSON.stringify(saved.footer));
   }
   console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed (daemon)');
   process.exit(failed ? 1 : 0);

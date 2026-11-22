@@ -43,7 +43,7 @@ import { Slider } from 'resource:///org/gnome/shell/ui/slider.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const PILL_VERSION = 29;
+const PILL_VERSION = 30;
 const IFACE = `
 <node>
   <interface name="dev.morph.Focus">
@@ -359,7 +359,7 @@ export default class FormatBridgeHelper extends Extension {
     // the clipboard is the "open everything" button: hover it for a label
     this._tabHit = new St.Bin({ reactive: true, track_hover: true, x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER });
     this._tabHit.set_child(this._tabIcon);
-    this._tipWire(this._tabHit, 'All apps');
+    this._tipWire(this._tabHit, 'Open Morph');
     tabBox.add_child(this._tabHit);
     this._dot.visible = false;
     tabBox.add_child(this._dot);
@@ -1067,7 +1067,7 @@ export default class FormatBridgeHelper extends Extension {
       return row;
     }
     const tone = ['ok', 'warn', 'plain'].includes(b.tone) ? b.tone : 'plain';
-    const col = { ok: '#137b72', warn: '#946e00', plain: '#5c6f72' }[tone];
+    const col = { ok: '#5a6e00', warn: '#946e00', plain: '#5c6f72' }[tone];
     const card = vbox({ style_class: 'fb-blk fb-blk-' + tone });
     const head = new St.BoxLayout({ style_class: 'fb-blk-head' });
     if (b.icon) head.add_child(this._tile('fb-blk-ic fb-blk-ic-' + tone, str(b.icon, 24), col, 18));
@@ -1138,33 +1138,33 @@ export default class FormatBridgeHelper extends Extension {
     const apps = Array.isArray(st.apps) ? st.apps.slice(0, 14).map((a) => ({ name: str(a && a.name, 30), logo: str(a && a.logo, 20) })) : [];
     try {
       // Every length below is a CSS length, so GNOME scales them all together. No pixel widths on actors.
-      const ACC = '#2aa198', INK = '#0a3a45', CREAM = '#fdf6e3', LINE = '#ddd3b4', TINT = '#e3efe1', RED = '#dc322f';
+      const INK = '#0a3a45', SOFT = '#586e75', CREAM = '#fdf6e3', LINE = '#ddd3b4', TINT = '#f3ecd7', RED = '#b5544b'; // the panel's own colours
       let done = false;
       const finish = (answer) => { if (done) return; done = true; this._setupAnswered = true; this._closeSetup(); this._send('setup:' + answer); };
       let sc = 1; try { sc = St.ThemeContext.get_for_stage(global.stage).scale_factor || 1; } catch (e) { /* 1 */ }
       const m = Main.layoutManager.primaryMonitor;
       const cardW = Math.max(260, Math.min(400, Math.floor(m.width / sc) - 40));
       const cols = cardW < 340 ? 1 : 2;
-      const card = vbox({ reactive: true, style: 'width: ' + cardW + 'px; background-color: ' + CREAM + '; color: ' + INK + '; border: 1px solid ' + LINE + '; border-radius: 14px; padding: 18px 20px 16px 20px; spacing: 8px;' });
+      const card = vbox({ reactive: true, style: 'width: ' + cardW + 'px; background-color: ' + CREAM + '; color: ' + INK + '; border: 1px solid ' + LINE + '; border-radius: 16px; padding: 16px 18px 14px 18px; spacing: 8px;' });
       const text = (t, style) => { const l = new St.Label({ text: t, x_expand: true, style: 'color: ' + INK + '; ' + style }); l.clutter_text.set_ellipsize(0); l.clutter_text.line_wrap = true; return l; };
-      const ring = 'box-shadow: 0 0 0 2px rgba(42,161,152,0.55);';
+      const ring = 'box-shadow: inset 0 0 0 2px #137b72;';
       // Title row with the close button: a 34px target, a smaller glyph. Closing means the same as "Got it".
       const head = new St.BoxLayout({ x_expand: true });
-      head.add_child(text(str(st.title, 60), 'font-weight: 600; font-size: 16pt;'));
+      head.add_child(text(str(st.title, 60), 'font-weight: 700; font-size: 15px;'));
       const x = new St.Button({ reactive: true, can_focus: true, accessible_name: 'Close', y_align: Clutter.ActorAlign.START });
       const xl = new St.Label({ text: '✕', x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER, x_expand: true, y_expand: true });
       x.set_child(xl);
       const xPaint = () => {
         const hot = x.hover, foc = x.has_key_focus();
-        x.set_style('width: 34px; height: 34px; border-radius: 17px; background-color: ' + (hot ? RED : 'transparent') + ';' + (foc ? ' ' + ring : ''));
-        xl.set_style('font-size: 11pt; color: ' + (hot ? CREAM : INK) + ';');
+        x.set_style('width: 28px; height: 28px; border-radius: 8px; background-color: ' + (hot ? RED : 'transparent') + ';' + (foc ? ' ' + ring : ''));
+        xl.set_style('font-size: 13px; color: ' + (hot ? CREAM : '#657b83') + ';');
       };
       ['notify::hover', 'key-focus-in', 'key-focus-out'].forEach((sig) => x.connect(sig, xPaint));
       x.connect('clicked', () => finish('ok'));
       xPaint();
       head.add_child(x);
       card.add_child(head);
-      (Array.isArray(st.body) ? st.body.slice(0, 4) : []).forEach((t, i) => card.add_child(text(str(t, 300), 'font-size: 10.5pt;' + (i ? ' opacity: 0.8;' : ''))));
+      (Array.isArray(st.body) ? st.body.slice(0, 4) : []).forEach((t, i) => card.add_child(text(str(t, 300), 'font-size: 12.5px;' + (i ? ' color: ' + SOFT + ';' : ''))));
       // The tools Morph converts for, as small labelled logos (two columns, one on a narrow screen).
       if (apps.length) {
         const grid = vbox({ x_expand: true, style: 'spacing: 6px; margin: 4px 0 2px 0;' });
@@ -1172,10 +1172,10 @@ export default class FormatBridgeHelper extends Extension {
           const row = new St.BoxLayout({ x_expand: true, style: 'spacing: 6px;' });
           try { row.layout_manager.homogeneous = true; } catch (e) { /* fine */ }
           apps.slice(i, i + cols).forEach((a) => {
-            const chip = new St.BoxLayout({ x_expand: true, style: 'spacing: 8px; padding: 6px 10px; border-radius: 9px; border: 1px solid ' + LINE + '; background-color: ' + TINT + ';' });
+            const chip = new St.BoxLayout({ x_expand: true, style: 'spacing: 8px; padding: 6px 10px; border-radius: 8px; border: 1px solid ' + LINE + '; background-color: ' + TINT + ';' });
             const ic = this._destIcon(a.logo, true);
             if (ic) { ic.y_align = Clutter.ActorAlign.CENTER; chip.add_child(ic); }
-            const nl = new St.Label({ text: a.name, y_align: Clutter.ActorAlign.CENTER, style: 'color: ' + INK + '; font-size: 10pt; font-weight: 600;' });
+            const nl = new St.Label({ text: a.name, y_align: Clutter.ActorAlign.CENTER, style: 'color: ' + INK + '; font-size: 12px; font-weight: 600;' });
             chip.add_child(nl);
             row.add_child(chip);
           });
@@ -1184,7 +1184,7 @@ export default class FormatBridgeHelper extends Extension {
         }
         card.add_child(grid);
       }
-      if (st.foot) card.add_child(text(str(st.foot, 200), 'font-size: 9pt; opacity: 0.7;'));
+      if (st.foot) card.add_child(text(str(st.foot, 200), 'font-size: 11.5px; color: ' + SOFT + ';'));
       // Buttons: Open Settings (quiet) and Got it (main).
       const btn = (label, main) => {
         const b = new St.Button({ reactive: true, can_focus: true, x_expand: main, accessible_name: label });
@@ -1192,9 +1192,9 @@ export default class FormatBridgeHelper extends Extension {
         b.set_child(l);
         const paint = () => {
           const foc = b.has_key_focus();
-          if (main) b.set_style('background-color: ' + (b.hover ? '#0f6a62' : '#137b72') + '; border: 1px solid #137b72; border-radius: 9px; padding: 8px 14px;' + (foc ? ' ' + ring : ''));
-          else b.set_style('border-radius: 9px; padding: 8px 14px; border: 1px solid ' + (foc ? INK : LINE) + '; background-color: ' + (b.hover ? '#f4ecd4' : CREAM) + ';' + (foc ? ' ' + ring : ''));
-          l.set_style('color: ' + (main ? CREAM : INK) + '; font-weight: 600; font-size: 11pt;');
+          if (main) b.set_style('background-color: ' + (b.hover ? '#0f655d' : '#137b72') + '; border: 1px solid #137b72; border-radius: 8px; padding: 6px 14px;' + (foc ? ' ' + ring : ''));
+          else b.set_style('border-radius: 8px; padding: 6px 14px; border: 1px solid ' + (foc ? INK : LINE) + '; background-color: ' + (b.hover ? TINT : CREAM) + ';' + (foc ? ' ' + ring : ''));
+          l.set_style('color: ' + (main ? '#ffffff' : INK) + '; font-weight: 600; font-size: 12.5px;');
         };
         ['notify::hover', 'key-focus-in', 'key-focus-out'].forEach((sig) => b.connect(sig, paint));
         paint();
@@ -1427,6 +1427,7 @@ export default class FormatBridgeHelper extends Extension {
     this._panel.add_child(scroll);
     this._fillMain(s);
     this._restoreScroll(scroll);
+    if (Array.isArray(s.footer) && s.footer.length) this._panel.add_child(this._footer(s.footer));
 
     if (Array.isArray(s.links) && s.links.length) {
       const foot = new St.BoxLayout({ style_class: 'fb-foot' });
@@ -1438,6 +1439,30 @@ export default class FormatBridgeHelper extends Extension {
       });
       this._panel.add_child(foot);
     }
+  }
+  // The slot under the list (Save as PDF, then Open / Show in folder): one fixed height whatever it holds.
+  _footer(items) {
+    const slot = new St.BoxLayout({ style_class: 'fb-foot-slot', x_expand: true });
+    try { slot.layout_manager.homogeneous = true; } catch (e) { /* fine */ }
+    items.slice(0, 2).forEach((o) => {
+      if (!o || typeof o !== 'object') return;
+      const action = str(o.action);
+      const b = new St.Button({ style_class: 'fb-foot-btn' + (o.done ? ' fb-done' : '') + (o.off ? ' fb-off' : ''), can_focus: false, reactive: !o.done && !o.off && ACTION_RE.test(action), track_hover: true, x_expand: true });
+      const box = new St.BoxLayout({ style_class: 'fb-foot-box', x_align: Clutter.ActorAlign.CENTER });
+      box.add_child(this._gl(str(o.icon, 20) || 'description', o.done ? '#5a6e00' : '#5c6f72', 16));
+      const label = this._lbl('fb-foot-label', o.label, 30);
+      box.add_child(label);
+      b.set_child(box);
+      if (b.reactive) {
+        b.connect('clicked', () => { if (o.busy) this._setBusy(action, str(o.busy, 40)); this._action(action); });
+        if (this._busy && this._busy.action === action) { b.add_style_class_name('fb-busy'); b.reactive = false; label.text = this._busy.label || label.text; }
+        b._fbLabel = label;
+        b._fbAction = action;
+        this._buttons.push(b);
+      }
+      slot.add_child(b);
+    });
+    return slot;
   }
   // Put a rebuilt list back where it was scrolled to. The list only knows its length once laid out, so
   // restore the moment its range grows (before the first paint: no flash at the top), with idle/timer backups.
@@ -1592,6 +1617,7 @@ export default class FormatBridgeHelper extends Extension {
       }
     }
     if (Array.isArray(p.cards)) {
+      if (p.cardsTitle) pane.add_child(this._lbl('fb-subhead', p.cardsTitle, 30));
       const cards = new St.BoxLayout({ style_class: 'fb-cards', x_expand: true });
       try { cards.layout_manager.homogeneous = true; } catch (e) { /* fine */ }
       p.cards.slice(0, 3).forEach((c) => {
@@ -1611,6 +1637,10 @@ export default class FormatBridgeHelper extends Extension {
         cards.add_child(b);
       });
       pane.add_child(cards);
+    }
+    if (Array.isArray(p.tail)) { // rows that close a page (Hide Morph), after everything else
+      first = false;
+      p.tail.slice(0, 3).forEach((o) => { if (o && typeof o === 'object') pane.add_child(sep(this._setRow('fb-opt fb-tail', o, []))); });
     }
     if (p.about && typeof p.about === 'object') {
       const hero = new St.BoxLayout({ style_class: 'fb-hero' });

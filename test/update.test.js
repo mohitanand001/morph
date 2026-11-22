@@ -86,7 +86,7 @@ const general = (d, c) => { c.action('view:settings'); return d.last().pane.opts
     const c = createCore(d.io); await c.start();
     c.focus({ app: 'firefox', title: 'x' }, 12);
     c.action('view:settings');
-    check('v12: Updates and Uninstall have their own sections', d.last().nav.map((n) => n.label).join() === 'General,Apps,Shortcuts,Privacy,Size,Updates,Uninstall,About');
+    check('v12: Updates and Uninstall have their own sections', d.last().nav.map((n) => n.label).join() === 'General,Apps,Shortcuts,Privacy,Updates,Uninstall,About');
     check('v12: General no longer carries them', !(d.last().pane.actions || []).some((o) => /pdate|ninstall/.test(o.label)) && !d.last().pane.opts.some((o) => /pdate|ninstall/.test(o.label)));
     c.action('view:updates');
     const acts = () => d.last().pane.actions;
@@ -131,10 +131,21 @@ const general = (d, c) => { c.action('view:settings'); return d.last().pane.opts
     check('v13: retry that works goes back to up to date', card().tone === 'ok');
     c.action('view:uninstall');
     const bl = d.last().pane.blocks, btns = bl[bl.length - 1].buttons;
-    check('v13: uninstall page heading and two actions, secondary first', d.last().pane.title === 'Uninstall Morph' && btns.length === 2 && btns[0].label === 'Keep Morph' && btns[0].kind === 'secondary' && btns[1].kind === 'danger' && btns[1].confirm);
-    check('v13: lists what is removed and says what happens to data', bl.some((b) => b.items && b.items.length === 6) && bl.some((b) => /settings/i.test(b.title || '') && b.tone === 'warn'));
+    check('v13: uninstall page heading and two actions, secondary first', d.last().pane.title === 'Uninstall Morph' && btns.length === 2 && btns[0].label === 'Keep Morph' && btns[0].kind === 'secondary' && btns[1].kind === 'danger' && btns[1].action === 'uninstall:ask' && !btns[1].confirm);
+    check('v13: lists what is removed and says what is kept', bl.some((b) => b.items && b.items.length === 6) && bl.some((b) => b.kind === 'text' && /not touched/.test(b.text)));
+    const before = JSON.stringify(bl.slice(0, -1));
+    c.action('uninstall:ask');
+    const bl2 = d.last().pane.blocks;
+    check('v13: Uninstall asks inline, in place of the buttons (nothing above moves), never a dialog', JSON.stringify(bl2.slice(0, bl.length - 1)) === before && /Uninstall Morph now\?/.test(JSON.stringify(bl2)) && !/confirm/.test(JSON.stringify(bl2)) && d.uninstalls === 0);
+    c.action('uninstall:no');
+    check('v13: Keep Morph in the question puts the buttons back', d.last().pane.blocks.length === bl.length && d.uninstalls === 0);
+    c.action('uninstall:yes'); await settle();
+    check('v13: Uninstall without asking first only asks', d.uninstalls === 0);
+    c.action('uninstall:yes'); await settle();
+    check('v13: Uninstall after the question uninstalls once', d.uninstalls === 1);
+    c.action('view:uninstall');
     c.action('view:settings');
-    check('v13: Keep Morph goes back, nothing removed', d.uninstalls === 0 && d.last().pane.title === 'General');
+    check('v13: Keep Morph goes back, nothing more removed', d.uninstalls === 1 && d.last().pane.title === 'General');
   }
   // --- the Uninstall row asks twice
   {

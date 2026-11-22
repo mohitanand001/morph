@@ -106,6 +106,7 @@ function createCore(io) {
   // Everything Morph has to say is said in its own panel, never with a desktop notification.
   let updateFailed = false;     // the last "Update now" did not finish
   let uninstallFailed = false;  // the uninstall did not finish
+  let uninstallAsk = false;     // the Uninstall page is asking "now?" in place of its buttons
   let helperHint = false;       // the GNOME helper is too old for the current Settings
   let checkNote = '';           // what the last manual check found
   let confirmTimer = null;
@@ -215,7 +216,7 @@ function createCore(io) {
     }
     if (ocrReady()) {
       if (ocrAsk === 'off' && ocrCanManage()) return ask('Remove image tables?', 'This deletes its files (' + OCR_SIZE + '). Morph keeps working without it.', 'Remove', 'ocr:off', 'Keep it');
-      return [{ kind: 'panel', tone: 'ok', icon: 'check_circle', title: 'Image tables are on', text: 'A copied image is read only when you pick an app, on this device. Nothing is uploaded.' },
+      return [{ kind: 'panel', tone: 'ok', icon: 'check_circle', title: 'Image tables are on', text: 'A copied image is read only when you pick an app, on this computer. Nothing is uploaded.' },
         ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Remove image tables', action: 'ocr:askoff', kind: 'secondary' }] }] : [])];
     }
     if (ocrAsk === 'on' && ocrCanManage()) return ask('Download ' + OCR_SIZE + '?', 'This installs RapidOCR once and needs internet. Images are read only on this computer, and only when you pick an app.' + (ocrLegacy() ? ' The older, larger version (about 3 GB) is removed first.' : ''), 'Install', 'ocr:on', 'Not now');
@@ -223,8 +224,8 @@ function createCore(io) {
       return [{ kind: 'panel', tone: 'warn', icon: 'download', title: 'Image tables got much smaller', text: 'The new version is ' + OCR_SIZE + ' instead of 3 GB, and reads a screenshot in a few seconds. Update to keep reading tables from images.' },
         ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Update image tables', action: 'ocr:ask', kind: 'primary' }] }] : [])];
     }
-    return [{ kind: 'panel', tone: ocrFail ? 'warn' : 'plain', icon: ocrFail ? 'warning' : 'table', title: 'Image tables (optional)',
-        text: ocrFail ? ocrFail : 'Reads tables from copied screenshots, on this device. Off until you turn it on.' },
+    return [{ kind: 'panel', tone: ocrFail ? 'warn' : 'plain', icon: ocrFail ? 'warning' : 'table', title: ocrFail ? 'Couldn’t turn on image tables' : 'Image tables (optional)',
+        text: ocrFail ? ocrFail : 'Reads tables from copied screenshots, on this computer. Off until you turn it on.' },
       ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: ocrFail ? 'Try again' : 'Turn on image tables', action: 'ocr:ask', kind: 'primary' }] }] : [])];
   }
   function ocrAction(arg) {
@@ -260,7 +261,7 @@ function createCore(io) {
     const t = (d.getHours() % 12 || 12) + ':' + String(d.getMinutes()).padStart(2, '0') + (d.getHours() < 12 ? ' AM' : ' PM');
     const n = e.n || 1, many = n > 1 ? n + ' copies' : 'a copy';
     const from = e.app || 'an app';
-    if (e.kind === 'ocr') return t + ' · Read ' + (n > 1 ? n + ' tables from images' : 'a table from an image') + ', on this device';
+    if (e.kind === 'ocr') return t + ' · Read ' + (n > 1 ? n + ' tables from images' : 'a table from an image') + ', on this computer';
     if (e.kind === 'skipped') return t + ' · Skipped ' + many + ' from ' + from;
     return t + ' · Read ' + (n > 1 ? many : e.chars + ' characters') + ' from ' + from;
   }
@@ -296,11 +297,10 @@ function createCore(io) {
       { id: 'keys', label: 'Shortcuts', icon: 'keyboard' },
       { id: 'privacy', label: 'Privacy', icon: 'lock' },
       ...(shellVersion >= 15 ? [{ id: 'ocr', label: 'Image tables', icon: 'image' }] : []),
-      { id: 'size', label: 'Size', icon: 'aspect_ratio' },
       ...(shellVersion >= 12 ? [{ id: 'updates', label: 'Updates', icon: 'refresh' }, { id: 'uninstall', label: 'Uninstall', icon: 'delete' }] : []),
       { id: 'about', label: 'About', icon: 'info' },
     ];
-    const cur = nav.some((n) => n.id === page) ? page : 'settings';
+    const cur = nav.some((n) => n.id === page) ? page : 'settings'; // 'size' now lives in General
     const spec = Object.assign(base, {
       view: 'settings', title: 'Settings', sub: '', subTone: '', back: 'view:main',
       primary: null, secondary: null, options: [], section: '', groups: [], recentTitle: '', recent: [], links: [], collapseAfterMs: 0, home: false, edit: null, note: '',
@@ -309,12 +309,12 @@ function createCore(io) {
     const sw = (on) => (on ? 'on' : 'off');
     if (cur === 'edit') {
       const on = allApps();
-      spec.pane = { title: 'Apps', lede: 'Where ' + APP_NAME + ' works. Drag to reorder.',
+      spec.pane = { title: 'Apps', lede: on ? 'Where ' + APP_NAME + ' works.' : 'Where ' + APP_NAME + ' works. Drag to reorder.',
         opts: [{ icon: 'grid_view', label: 'All apps', sub: 'Every app, except password managers', sw: sw(on), action: 'toggle:readfrom' }],
         apps: setupApps().map((r) => ({ label: r.name, dest: logoOf(r), sw: on ? 'none' : (r.enabled ? 'on' : 'off'), action: on ? '' : 'rule:' + r.id })),
         keepOrder: true };
     } else if (cur === 'keys') {
-      const KEY_SHORT = { paste: 'Paste, fixed', plain: 'Paste as plain text', pill: 'Show or hide Morph', auto: 'Auto-format on/off', pdf: 'Save as PDF' };
+      const KEY_SHORT = { paste: 'Paste converted for this app', plain: 'Paste as plain text', pill: 'Show or hide Morph', auto: 'Convert automatically on/off', pdf: 'Save as PDF' };
       const KEY_ICON = { paste: 'content_paste', plain: 'notes', pill: 'grid_view', auto: 'bolt', pdf: 'description' };
       spec.pane = { title: 'Shortcuts', lede: 'Click a shortcut to turn it on or off.',
         keys: shortcutsForSettings().map((k, i) => ({ label: KEY_SHORT[k.id] || k.name, icon: KEY_ICON[k.id] || 'keyboard', keys: k.label.split(' ').filter(Boolean).slice(0, 5), sw: sw(k.on && !k.taken), note: k.taken ? 'Taken by another app' : '', action: 'key:' + i })) };
@@ -349,37 +349,39 @@ function createCore(io) {
       let st;
       if (checking) st = { tone: 'plain', icon: 'refresh', title: 'Checking for updates…', text: 'Looking at the Morph website.', button: { label: 'Checking…', action: 'checkupdate:', disabled: true, kind: 'secondary' } };
       else if (updating) st = { tone: 'warn', icon: 'download', title: 'Updating…', text: 'Morph restarts when it is done.', button: { label: 'Updating…', action: 'update:', disabled: true, kind: 'primary' } };
-      else if (updateFailed) st = { tone: 'warn', icon: 'error', title: 'The update did not finish', text: 'Try again, or run morph --update in a terminal.', button: { label: 'Try again', action: 'update:', kind: 'primary' } };
-      else if (checkFailed) st = { tone: 'warn', icon: 'error', title: 'Could not check for updates', text: 'Morph could not reach its website. Check your connection and try again.', button: { label: 'Retry', action: 'checkupdate:', kind: 'primary' } };
+      else if (updateFailed) st = { tone: 'warn', icon: 'error', title: 'The update did not finish', text: 'Try again, or run morph --update.', button: { label: 'Try again', action: 'update:', kind: 'primary' } };
+      else if (checkFailed) st = { tone: 'warn', icon: 'error', title: 'Could not check for updates', text: 'Check your connection and try again.', button: { label: 'Retry', action: 'checkupdate:', kind: 'primary' } };
       else if (updateInfo) st = { tone: 'warn', icon: 'download', title: 'Version ' + updateInfo.version + ' is available', text: 'Updating installs it and restarts Morph.', button: { label: 'Update now', action: 'update:', kind: 'primary' } };
       else st = { tone: 'ok', icon: 'check_circle', title: 'You are up to date', text: 'This is the latest version of Morph.', button: { label: 'Check for updates', action: 'checkupdate:', kind: 'secondary' } };
-      spec.pane = { title: 'Updates', lede: 'Morph keeps itself current.',
+      spec.pane = { title: 'Updates', lede: 'Check for and install new versions.',
         blocks: [Object.assign({ kind: 'status', items: meta }, st)],
         opts: [{ icon: 'schedule', label: 'Check automatically', sub: 'Looks at the Morph website once a day', sw: sw(settings.updateCheck), action: 'toggle:updates' }] };
-      if (updateInfo && !checking && !updating && !checkFailed) spec.pane.blocks[0].button.label = 'Update now';
     } else if (cur === 'uninstall' && shellVersion >= 13) {
-      spec.pane = { title: 'Uninstall Morph', lede: 'Remove Morph from this account.',
+      const ocrIn = ocrReady() || ocrLegacy() || ocrJob;
+      spec.pane = { title: 'Uninstall Morph', lede: 'Removes Morph from this computer, for your account. You can install it again at any time.',
         blocks: [
           ...(uninstallFailed ? [{ kind: 'panel', tone: 'warn', icon: 'error', title: 'Uninstall did not finish', text: 'Run morph --uninstall in a terminal instead.' }] : []),
-          { kind: 'text', text: 'Uninstalling stops Morph and removes it from this computer. You can install it again at any time.' },
-          { kind: 'panel', tone: 'plain', title: 'What will be removed', items: [
+          { kind: 'panel', tone: 'plain', title: 'What is removed', items: [
             'The Morph program and its folder',
             'Your Morph settings: chosen apps, order, size and shortcuts',
             'Morph log files',
             'Start at login',
             'The tab on the screen edge (its GNOME helper)',
             'The morph command',
-            ...(ocrReady() || ocrLegacy() || ocrJob ? ['Image tables: RapidOCR and its models in Morph\'s own folder'] : []) ] },
-          { kind: 'panel', tone: 'warn', icon: 'warning', title: 'This deletes your Morph settings', text: 'Nothing you copy is ever stored by Morph, so there is no clipboard data to lose. Your documents and other files are not touched.' + (ocrReady() || ocrLegacy() || ocrJob ? ' An OCR package you installed yourself, outside Morph, is not touched either.' : '') },
-          { kind: 'buttons', buttons: io.uninstall ? [
-            { label: 'Keep Morph', action: 'view:settings', kind: 'secondary' },
-            { label: 'Uninstall Morph', action: 'uninstall:', kind: 'danger', confirm: { title: 'Uninstall Morph?', body: 'This removes Morph and its settings from this account. You can install it again later.', ok: 'Uninstall' } } ] : [{ label: 'Keep Morph', action: 'view:settings', kind: 'secondary' }] },
+            ...(ocrIn ? ['Image tables: RapidOCR and its models in Morph\'s own folder'] : []) ] },
+          { kind: 'text', text: 'Your documents and files are not touched, and nothing you copied was ever stored.' + (ocrIn ? ' An OCR package you installed yourself, outside Morph, is not touched either.' : '') },
+          // The question takes the place of the buttons: nothing above it moves.
+          ...(uninstallAsk && io.uninstall ? [{ kind: 'panel', tone: 'warn', icon: 'warning', title: 'Uninstall Morph now?', text: 'Morph and its settings are removed.' },
+            { kind: 'buttons', buttons: [{ label: 'Keep Morph', action: 'uninstall:no', kind: 'secondary' }, { label: 'Uninstall', action: 'uninstall:yes', kind: 'danger' }] }]
+            : [{ kind: 'buttons', buttons: io.uninstall ? [
+              { label: 'Keep Morph', action: 'view:settings', kind: 'secondary' },
+              { label: 'Uninstall Morph', action: 'uninstall:ask', kind: 'danger' }] : [{ label: 'Keep Morph', action: 'view:settings', kind: 'secondary' }] }]),
         ] };
     } else if (cur === 'updates') {
       const status = checking ? 'Checking…' : updating ? 'Updating…' : updateInfo ? 'Version ' + updateInfo.version + ' is available' : checkNote === 'Could not reach the Morph website' ? 'Could not reach the website' : 'You are on the latest version';
       const actions = [{ icon: updateInfo ? 'download' : 'check_circle', label: status, sub: 'Version ' + io.version + ' · press refresh to check again', trail: 'refresh', action: 'checkupdate:' }];
       if (updateInfo) actions.push({ icon: 'download', label: updating ? 'Updating…' : 'Update to ' + updateInfo.version, sub: updating ? 'Morph restarts when it is done' : 'Installs it and restarts Morph', action: 'update:' });
-      spec.pane = { title: 'Updates', lede: 'Morph keeps itself current.', actions,
+      spec.pane = { title: 'Updates', lede: 'Check for and install new versions.', actions,
         opts: [{ icon: 'schedule', label: 'Check every day', sub: 'Looks at the Morph website once a day', sw: sw(settings.updateCheck), action: 'toggle:updates' }] };
     } else if (cur === 'uninstall') {
       spec.pane = { title: 'Uninstall', lede: 'Remove Morph from this account.',
@@ -397,7 +399,10 @@ function createCore(io) {
         ] };
       // ✕ on the panel only closes it into the tab; hiding Morph altogether is here.
       const pk = settings.shortcuts.find((k) => k.id === 'pill');
-      spec.pane.actions = [{ icon: 'power_settings_new', label: 'Hide ' + APP_NAME, sub: 'Until you press ' + (pk && pk.on ? accelLabel(pk.accel, false) : 'morph --restart') + ' or log in again', action: 'hide:' }];
+      const SUB = { s: 'Compact', m: 'Default', l: 'Roomy' };
+      spec.pane.cardsTitle = 'Size';
+      spec.pane.cards = ['s', 'm', 'l'].map((z) => ({ label: SIZE_NAMES[z], sub: SUB[z], size: z, on: settings.size === z, action: 'size:' + z }));
+      spec.pane.tail = [{ icon: 'power_settings_new', label: 'Hide ' + APP_NAME, sub: 'Until you press ' + (pk && pk.on ? accelLabel(pk.accel, false) : 'morph --restart') + ' or log in again', action: 'hide:' }];
       if (shellVersion < 12) {
         // An older helper only draws switches: keep the old two-click rows until it is updated.
         spec.pane.opts.push({ icon: 'download', label: 'Check for updates daily', sub: 'Looks at the Morph website once a day', sw: sw(settings.updateCheck), action: 'toggle:updates' });
@@ -486,13 +491,17 @@ function createCore(io) {
     } else {
       spec.secondary = { label: 'Check again', action: 'refresh:', busy: 'Checking…' };
     }
-    if (spec.options.length) {
+    // Saving a PDF is a file, not an app: it has its own slot under the list, the same size in every state.
+    if (spec.options.length && shellVersion < 30) { // an older helper has no footer slot: keep the chip in the list
       const pdfChip = tickDest === 'pdf' ? { label: 'PDF ↓', done: true } : idle ? { label: 'PDF ↓', action: 'pdf:', off: true } : { label: 'PDF ↓', action: 'pdf:', color: '#d93025', busy: 'Saving…' };
       const last = spec.options[spec.options.length - 1];
       if (last.length < 2) last.push(pdfChip); else spec.options.push([pdfChip]);
+      if (flash && flash.pdf && lastPdf) spec.links = [{ label: 'Open the PDF', action: 'openpdf:' }, { label: 'Show in folder', action: 'showpdf:' }];
+    } else if (spec.options.length) {
+      spec.footer = flash && flash.pdf && lastPdf ? [{ label: 'Open the PDF', action: 'openpdf:', icon: 'description' }, { label: 'Show in folder', action: 'showpdf:', icon: 'link' }]
+        : [tickDest === 'pdf' ? { label: 'Saved as PDF', done: true, icon: 'check' } : idle ? { label: 'Save as PDF', action: 'pdf:', off: true, icon: 'description' } : { label: 'Save as PDF', action: 'pdf:', busy: 'Saving…', icon: 'description' }];
     }
-    if (flash && flash.pdf && lastPdf) spec.links = [{ label: 'Open the PDF', action: 'openpdf:' }, { label: 'Show in folder', action: 'showpdf:' }];
-    else if (copy && crossLinks.length) spec.links = crossLinks.map((l, i) => ({ label: (l.kind === 'jira' ? '🎫 ' : l.kind === 'email' ? '✉ ' : '🔗 ') + l.label, action: 'openlink:' + i }));
+    if (!spec.links.length && copy && crossLinks.length) spec.links = crossLinks.map((l, i) => ({ label: (l.kind === 'jira' ? '🎫 ' : l.kind === 'email' ? '✉ ' : '🔗 ') + l.label, action: 'openlink:' + i }));
     if (flash) {
       if (flash.done && spec.primary) spec.primary = { label: flash.done.replace(/^✓ /, ''), done: true };
       if (!(flash.done && spec.primary) || flash.sub) { spec.sub = flash.sub; spec.subTone = flash.tone; }
@@ -773,7 +782,7 @@ function createCore(io) {
       settings.appOrder = appOrder().map((id) => (shown.includes(id) ? list[k++] : id));
       save(); sendPill();
     };
-    if (kind === 'view') pillView = PILL_PAGES.includes(arg) ? arg : 'main';
+    if (kind === 'view') { pillView = PILL_PAGES.includes(arg) ? arg : 'main'; uninstallAsk = false; }
     if (kind === 'dswap' && /^\d{1,2}t\d{1,2}$/.test(arg)) {
       const list = list0();
       const [a, b] = arg.split('t').map(Number);
@@ -871,7 +880,7 @@ function createCore(io) {
     if (kind === 'ocr' && /^(on|off|cancel|ask|askstop|askoff|no)$/.test(arg)) ocrAction(arg);
     if (kind === 'update') runUpdate();
     if (kind === 'checkupdate') checkNow();
-    if (kind === 'uninstall') askUninstall();
+    if (kind === 'uninstall') askUninstall(arg);
     const mv = kind === 'moved' && /^([lr])(\d)y(\d{1,4})$/.exec(arg);
     if (mv) {
       settings.pillSide = mv[1];
@@ -902,7 +911,7 @@ function createCore(io) {
     try { res = await io.savePdf({ ast: doc, title: FB.engine.pdfTitle(r.ast) }); } catch (e) { res = null; }
     if (res && res.ok) {
       lastPdf = res.path || '';
-      flash = { sub: 'Saved to Downloads: ' + res.name, tone: 'ok' };
+      flash = { sub: 'Saved to Downloads: ' + res.name, tone: 'ok', pdf: !!lastPdf };
       startTick('pdf');
       return true;
     }
@@ -960,8 +969,14 @@ function createCore(io) {
     sendPill();
   }
   // Two clicks: the first only arms it (and disarms itself after eight seconds).
-  async function askUninstall() {
+  async function askUninstall(arg) {
     if (!io.uninstall) return;
+    if (shellVersion >= 13 && pillView === 'uninstall') { // the page asks inline, never a GNOME dialog
+      if (arg === 'ask') { uninstallAsk = true; sendPill(); return; }
+      if (arg === 'no') { uninstallAsk = false; sendPill(); return; }
+      if (arg !== 'yes' || !uninstallAsk) { uninstallAsk = true; sendPill(); return; }
+      uninstallAsk = false;
+    }
     if (shellVersion < 12 && !confirmUninstall) {
       confirmUninstall = true;
       io.clearTimeout(confirmTimer);

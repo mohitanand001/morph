@@ -61,7 +61,7 @@
 .fb-ib { width: 28px; height: 28px; border-radius: 8px; padding: 0; }
 .fb-ib:hover { background-color: #f3ecd7; }
 .fb-wc { spacing: 2px; padding-left: 6px; border-left: 1px solid #e7ddc0; }
-.fb-x:hover { background-color: #e5484d; }
+.fb-x:hover { background-color: #b5544b; }
 
 /* the scrolling body: no visible scrollbar */
 .fb-scroll StScrollBar { width: 5px; min-width: 5px; padding: 2px 1px; }
@@ -155,12 +155,12 @@
 .fb-app-row.fb-floating { border-color: #2aa198; background-color: #fdf6e3; }
 .fb-swbtn { padding: 0; }
 .fb-cards { spacing: 8px; }
-.fb-card { border: 2px solid #ddd3b4; border-radius: 12px; padding: 8px; background-color: #fdf6e3; }
+.fb-card { border: 1px solid #ddd3b4; border-radius: 12px; padding: 8px; background-color: #fdf6e3; }
 .fb-card:hover { border-color: rgba(42, 161, 152, 0.45); }
 .fb-card-on { border-color: #2aa198; background-color: rgba(42, 161, 152, 0.12); }
 .fb-card-box { spacing: 4px; }
 .fb-wg-holder { height: 32px; }
-.fb-wg { border: 2px solid #93a1a1; border-radius: 5px; }
+.fb-wg { border: 1px solid #93a1a1; border-radius: 5px; }
 .fb-wg-bar { height: 5px; background-color: #93a1a1; }
 .fb-wg-s { width: 24px; height: 16px; }
 .fb-wg-m { width: 34px; height: 22px; }
@@ -186,7 +186,7 @@
 .fb-blk { width: 266px; padding: 12px; border-radius: 12px; border: 1px solid #e7ddc0; background-color: #fffaf0; margin: 4px 0 10px 0; spacing: 6px; }
 .fb-size-s .fb-blk { width: 231px; }
 .fb-size-l .fb-blk { width: 321px; }
-.fb-blk-ok { background-color: #e6f4f1; border-color: #9fd3cc; }
+.fb-blk-ok { background-color: #eef0da; border-color: #cdd49c; }
 .fb-blk-warn { background-color: #fbf2d8; border-color: #e3cd8a; }
 .fb-blk-plain { background-color: #fffaf0; border-color: #e7ddc0; }
 .fb-blk-head { spacing: 10px; }
@@ -194,7 +194,7 @@
 .fb-size-s .fb-blk-title { width: 185px; }
 .fb-size-l .fb-blk-title { width: 275px; }
 .fb-blk-ic { width: 28px; height: 28px; border-radius: 14px; }
-.fb-blk-ic-ok { background-color: #cfeae6; }
+.fb-blk-ic-ok { background-color: #dde2b0; }
 .fb-blk-ic-warn { background-color: #f4e3ae; }
 .fb-blk-ic-plain { background-color: #f3ecd7; }
 .fb-blk-item { color: #0a3a45; }
@@ -211,3 +211,15 @@
 /* Keyboard focus (Settings takes the keyboard while open): a ring that does not change any size. */
 .fb-panel StButton:focus { box-shadow: inset 0 0 0 2px #137b72; }
 .fb-panel .fb-ib:focus, .fb-panel .fb-nav:focus { box-shadow: inset 0 0 0 2px #137b72; background-color: #f3ecd7; }
+
+/* The footer slot under the app list: always there, so saving a PDF never moves anything. */
+.fb-foot-slot { margin: 2px 12px 10px 12px; spacing: 6px; height: 30px; }
+.fb-foot-btn { padding: 0 10px; height: 30px; border-radius: 8px; border: 1px solid #e7ddc0; background-color: #fdf6e3; }
+.fb-foot-btn:hover { background-color: #f3ecd7; }
+.fb-foot-box { spacing: 6px; }
+.fb-foot-label { font-size: 12px; font-weight: 600; color: #0a3a45; }
+.fb-foot-btn.fb-off { opacity: 0.45; }
+.fb-foot-btn.fb-done { background-color: #e8ebcf; border-color: transparent; }
+.fb-foot-btn.fb-done .fb-foot-label { color: #5a6e00; }
+.fb-foot-btn.fb-busy .fb-foot-label { color: #93a1a1; }
+.fb-tail { margin-top: 6px; }
