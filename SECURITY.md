@@ -8,4 +8,4 @@ You can expect a reply within a few days. Please give us reasonable time to fix 
 
 ## What Morph touches
 
-Morph reads the clipboard only as described in the README, keeps nothing you copy, and sends nothing over the network apart from the optional update check and the optional OCR install. Reports that show it doing more than that are especially welcome.
+Morph reads the clipboard only as described in the README, keeps nothing you copy, and sends nothing over the network apart from the optional update check and the optional image-tables download. Reports that show it doing more than that are especially welcome.

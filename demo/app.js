@@ -4,8 +4,9 @@
 const $ = (id) => document.getElementById(id);
 const E = FB.engine;
 const SAMPLES = window.FB_SAMPLES;
-const ORDER = ['slack', 'jira', 'confluence', 'email', 'gdocs', 'markdown', 'text', 'notion', 'linear', 'teams'];
-const SHORT = { slack: 'Slack', jira: 'Jira', confluence: 'Confluence', email: 'Email', gdocs: 'Docs', markdown: 'Markdown', text: 'Text', notion: 'Notion', linear: 'Linear', teams: 'Teams' };
+// Same names and order as the app (Settings → Apps).
+const ORDER = ['slack', 'jira', 'confluence', 'email', 'gdocs', 'notion', 'linear', 'teams', 'markdown', 'text'];
+const SHORT = { slack: 'Slack', jira: 'Jira', confluence: 'Confluence', email: 'Outlook', gdocs: 'Google Docs', markdown: 'GitHub', text: 'Terminal', notion: 'Notion', linear: 'Linear', teams: 'Teams' };
 const WHERE = {
   slack: 'Paste into a Slack message box.', jira: 'Paste into a Jira description or comment.', confluence: 'Paste into a Confluence page while editing.',
   email: 'Gmail, Outlook and Apple Mail.', gdocs: 'Paste into a Google Doc.', markdown: 'GitHub, Claude, ChatGPT, Cursor and anything that reads markdown.',

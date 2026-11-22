@@ -96,16 +96,16 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
 <header>
   <div class="mark"><i><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h167q11-35 43-57.5t70-22.5q40 0 71.5 22.5T594-840h166q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm80-80h400v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm200-190q13 0 21.5-8.5T510-820q0-13-8.5-21.5T480-850q-13 0-21.5 8.5T450-820q0 13 8.5 21.5T480-790Z"/></svg></i>Morph</div>
   <h1>Copy once. Paste right, anywhere.</h1>
-  <p class="lede">Morph sits as a slim tab on the edge of your screen and re-shapes what you copied for Slack, Jira, Confluence, Docs, Email, Markdown and more, so tables, lists and code survive the paste. Everything happens on your computer.</p>
+  <p class="lede">Morph sits as a slim tab on the edge of your screen and re-shapes what you copied for Slack, Jira, Confluence, Google Docs, Outlook, Notion and more, so tables, lists and code survive the paste. Everything happens on your computer.</p>
   <div class="term"><pre>curl -fsSL https://mohitanand001.github.io/morph/install.sh | bash</pre><button class="copy" type="button">Copy</button></div>
   <div class="cta">
     <a class="dl" href="try.html">Try it in your browser<small>copy a sample, pick an app, see what pastes</small></a>
     <a class="ghost" href="https://github.com/mohitanand001/morph">Source on GitHub</a>
   </div>
-  <div class="chips"><span class="chip">Version 0.15.0-rc.10 · testing</span><span class="chip">Linux · GNOME</span><span class="chip">Source available</span></div>
+  <div class="chips"><span class="chip">Version 0.15.0-rc.11 · testing</span><span class="chip">Linux · GNOME</span><span class="chip">Source available</span></div>
 </header>
 
-<nav aria-label="Sections"><div class="in"><a href="try.html">Try it</a><a href="#install">Install</a><a href="#use">Use</a><a href="#privacy">Privacy</a><a href="#ocr">Tables from images</a><a href="#update">Update</a><a href="#uninstall">Uninstall</a><a href="#help">Troubleshooting</a></div></nav>
+<nav aria-label="Sections"><div class="in"><a href="try.html">Try it</a><a href="#install">Install</a><a href="#use">Use</a><a href="#privacy">Privacy</a><a href="#ocr">Image tables</a><a href="#update">Update</a><a href="#uninstall">Uninstall</a><a href="#help">Troubleshooting</a></div></nav>
 
 <section id="install">
   <h2>Install on Linux</h2>
@@ -131,21 +131,21 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
 
   <div class="step"><div class="n">3</div><div class="body">
     <h3>Prefer a package?</h3>
-    <p>A <a href="morph_0.15.0-rc.10_all.deb">.deb for Debian and Ubuntu</a> installs the same thing system-wide. Install it with <code>sudo apt install ./morph_0.15.0-rc.10_all.deb</code>, then open Morph from the app menu. Updates come from a newer .deb.</p>
+    <p>A <a href="morph_0.15.0-rc.11_all.deb">.deb for Debian and Ubuntu</a> installs the same thing system-wide. Install it with <code>sudo apt install ./morph_0.15.0-rc.11_all.deb</code>, then open Morph from the app menu. Updates come from a newer .deb.</p>
   </div></div>
 </section>
 
 <section id="use">
   <h2>Use it</h2>
-  <p class="sub">Morph never takes focus, so the paste lands where you were.</p>
+  <p class="sub">Morph's panel never takes the keyboard from your app, so the paste lands where you were.</p>
   <div class="step"><div class="n">1</div><div class="body"><h3>Copy as usual</h3><p>From a spreadsheet, Slack, a web page, an AI chat, a terminal or a PDF.</p></div></div>
   <div class="step"><div class="n">2</div><div class="body"><h3>Pick where it's going</h3><p>Click the tab on the screen edge (or press <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>F</kbd>) and choose the app you're pasting into.</p></div></div>
-  <div class="step"><div class="n">3</div><div class="body"><h3>Paste</h3><p>Press <kbd>Ctrl</kbd> <kbd>V</kbd>. Not right? Press <b>Undo</b> in Morph to put your original back. Or skip a click entirely: <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>V</kbd> pastes fixed for the app you're in.</p></div></div>
+  <div class="step"><div class="n">3</div><div class="body"><h3>Paste</h3><p>Press <kbd>Ctrl</kbd> <kbd>V</kbd>. Not right? Press the <b>undo</b> arrow on Morph's card to put your original back. Or skip a click entirely: <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>V</kbd> pastes it converted for the app you're in.</p></div></div>
   <div class="grid two">
-    <div class="card"><h3>Tables</h3><p>Spreadsheet ranges, Slack text tables, psql output and web tables become real tables in Jira, Confluence, email and Docs.</p></div>
+    <div class="card"><h3>Tables</h3><p>Spreadsheet ranges, Slack text tables, psql output and web tables become real tables in Jira, Confluence, Outlook and Google Docs.</p></div>
     <div class="card"><h3>Lists</h3><p>Odd bullets, a) b) numbering and Outlook's fake lists become proper nested lists.</p></div>
     <div class="card"><h3>Code and terminal output</h3><p>Indentation and line breaks survive, and code lands as a code block.</p></div>
-    <div class="card"><h3>Already fine?</h3><p>If a paste would already work, Morph leaves it alone and says so.</p></div>
+    <div class="card"><h3>Already fine?</h3><p>Slack to Slack, or Jira to Confluence, already pastes right, so Morph puts your copy back as it was.</p></div>
   </div>
 </section>
 
@@ -174,7 +174,7 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
 
 <section id="uninstall">
   <h2>Uninstall</h2>
-  <p class="sub">Open Morph, then Settings, then <b>Uninstall</b>, or run the command below. It removes everything: the program, the GNOME helper, start-at-login, the command, your settings, logs, caches and the optional OCR files. Installed from the .deb? Run <code>sudo apt remove --purge morph</code>.</p>
+  <p class="sub">Open Morph, then Settings, then <b>Uninstall</b>, or run the command below. It removes everything: the program, the GNOME helper, start-at-login, the command, your settings, logs, caches and the optional image-tables files. It asks once before it removes anything. Installed from the .deb? Run <code>sudo apt remove --purge morph</code>.</p>
   <div class="term"><pre>morph --uninstall</pre><button class="copy" type="button">Copy</button></div>
 </section>
 
@@ -184,7 +184,7 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
     <p>Run <code>morph --status</code>. If the app is running but nothing shows, switch the GNOME helper off and on: <code>gnome-extensions disable morph-focus@morph.dev; gnome-extensions enable morph-focus@morph.dev</code>.</p>
     <p>To see the welcome again, run <code>morph --setup</code>.</p></div></details>
   <details><summary>Morph says "Not read"</summary><div class="in"><p>You set Morph to work in only some apps, and you copied from another one. Pick an app in Morph to convert it anyway, or switch on <b>All apps</b> in Settings → Apps.</p></div></details>
-  <details><summary>I hid Morph with the ✕</summary><div class="in"><p>Press <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>F</kbd>, or run <code>morph --restart</code>.</p></div></details>
+  <details><summary>I hid Morph</summary><div class="in"><p>The ✕ only closes the panel into its tab. If you used <b>Hide Morph</b> in Settings → General, press <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>F</kbd>, or run <code>morph --restart</code>.</p></div></details>
   <details><summary>"gjs is missing"</summary><div class="in"><p>It's part of GNOME, so this is rare. On Ubuntu run <code>sudo apt install gjs</code>, on Fedora <code>sudo dnf install gjs</code>.</p></div></details>
   <details><summary>Where does it log?</summary><div class="in"><p>In <code>~/.cache/morph.log</code>. It never contains what you copied. For more detail, run <code>morph --stop</code>, then <code>FB_DEBUG=1 gjs -m ~/.local/share/morph/daemon/gjs-main.js</code> in a terminal.</p></div></details>
   <details><summary>Report a problem</summary><div class="in"><p><a href="https://github.com/mohitanand001/morph/issues/new/choose">Open an issue on GitHub</a> with the two apps involved, what you copied and what you got, plus the output of <code>morph --status</code>. For security problems, use the <a href="https://github.com/mohitanand001/morph/security/policy">security policy</a> instead.</p></div></details>

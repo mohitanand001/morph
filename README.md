@@ -16,26 +16,26 @@ curl -fsSL https://mohitanand001.github.io/morph/install.sh | bash
 
 The installer checks the download against a fingerprint before it installs anything. A short welcome opens by itself; there is nothing to set up. No log out is needed.
 
-Needs GNOME (tested on Ubuntu with Wayland) and `gjs`, which GNOME already includes. Other commands: `morph --status`, `--restart`, `--setup` (show the welcome again), `--update`, `--uninstall`.
+Needs GNOME (tested on Ubuntu with Wayland) and `gjs`, which GNOME already includes. Other commands: `morph --status`, `--restart`, `--setup` (show the welcome again), `--update`, `--enable-ocr` (turn on image tables), `--uninstall`.
 
 You can read the installer first: [`site/install.sh`](site/install.sh).
 
 ## What it does
 
-- **Tables**: Slack text tables, spreadsheet ranges, psql/mysql output and HTML tables become real tables in Jira, Confluence, Slack, email and Docs.
-- **Destination-aware copy**: each destination gets the format it understands. Pairs that already paste fine are passed through untouched, and Morph says so.
+- **Tables**: Slack text tables, spreadsheet ranges, psql/mysql output and HTML tables become real tables in Jira, Confluence, Slack, Outlook and Google Docs.
+- **Destination-aware copy**: each destination gets the format it understands. Pairs that already paste fine (Slack to Slack, Jira to Confluence) get your copy back untouched.
 - **Lists and indentation**: odd bullets, `a) b)` numbering, mixed tabs and spaces and Outlook's fake lists become real nested lists.
 - **Terminal output** and **PDF text** are cleaned up too.
-- **A slim tab** on the screen edge opens Morph, which shows what you copied and offers the apps to convert it for. Click an app, then paste with Ctrl+V.
-- **Image tables (optional)**: reads a table from a copied screenshot, on your device, only when you click. Turn it on in Settings → Image tables (about 400 MB, using RapidOCR).
+- **A slim tab** on the screen edge opens Morph, which shows what you copied and offers the apps to convert it for. The app you're in is at the top; click an app, then paste with Ctrl+V. The ✕ closes it back into the tab.
+- **Image tables (optional)**: reads a table from a copied screenshot, on your computer, only when you click. Turn it on in Settings → Image tables (about 400 MB, using RapidOCR).
 
 ## Privacy
 
 - Morph never stores what you copy and never sends it anywhere. Conversion happens on your computer.
 - Morph works in all apps by default, except password managers. In Settings → Apps you can limit it to only the apps you pick. Copies that an app marks as secret are always ignored.
-- Settings, Privacy shows a log of what Morph read: time, app and size, never the content.
+- Settings → Privacy shows a log of what Morph read: time, app and size, never the content.
 - The only network use is an optional daily update check and the optional image-tables download.
-- `morph --uninstall` removes the program, the GNOME helper, settings, logs and caches.
+- `morph --uninstall` removes the program, the GNOME helper, settings, logs, caches and the optional image-tables files.
 
 Because the code is readable, you can check these claims yourself. The privacy gate lives in `daemon/core.js` (`mayRead`).
 

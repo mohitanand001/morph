@@ -8,7 +8,7 @@ Open a GitHub issue and fill in the template. Please do not paste anything priva
 
 ## Working on the code
 
-- `daemon/core.js` holds the logic and `daemon/gjs-main.js` the GNOME program. `gnome-extension/` is the helper that draws the pill. `src/core/` and `lib/` do the format conversion.
+- `daemon/core.js` holds the logic and `daemon/gjs-main.js` the GNOME program. `gnome-extension/` is the helper that draws the tab and its panel. `src/core/` and `lib/` do the format conversion.
 - Run all tests with `node test/run-all.js`. They must pass before you open a pull request.
 - Add a test for every fix or feature. Test data must be made up: no real names, emails, hosts or file names.
 - Keep changes small and focused, and keep the wording in the interface plain and honest.

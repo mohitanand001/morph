@@ -220,5 +220,12 @@ check('the GNOME program has no top-level await (one that never finishes would s
   check('the background program loads the converter files in the page order', JSON.stringify(idx) === JSON.stringify(loaded), idx.join() + ' vs ' + loaded.join());
 }
 check('the top-bar tray icon is optional (off by default on Linux) with a toggle in General', /trayIcon: process\.platform === 'darwin'/.test(read('main.js')) && /toggle:tray/.test(read('main.js')) && /if \(tray \|\| !settings\.trayIcon\) return/.test(read('main.js')));
+// The website and the demo say what the app says: the same app names, the same feature names, no retired wording.
+{
+  const core = read('daemon/core.js'), demo = read('demo/app.js'), site = read('site/index.html'), readme = read('README.md');
+  const obj = (src, name) => { const m = src.match(new RegExp('const ' + name + ' = (\\{[^}]*\\})')); return m ? JSON.stringify(Function('return ' + m[1])()) : 'missing ' + name; };
+  check('the demo names apps exactly as the app does', obj(demo, 'SHORT') === obj(core, 'OPTION_LABEL'), obj(demo, 'SHORT') + ' vs ' + obj(core, 'OPTION_LABEL'));
+  check('site and README use the app\'s wording (Image tables, no "says so", no ✕ that hides)', !/Tables from images|table OCR|Enable table OCR|Settings → Images\b|and says so|hid Morph with the ✕|pastes fixed|never takes focus|1 GB/.test(site + readme) && /Image tables/.test(site) && /Image tables/.test(readme));
+}
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed (static)');
 process.exit(failed ? 1 : 0);

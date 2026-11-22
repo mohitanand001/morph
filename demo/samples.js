@@ -107,7 +107,7 @@ function extra() {
     { id: 'logs', app: 'text', title: 'A server log', blurb: 'Timestamps, levels and a Python traceback.', html: '', text: LOGS, source: 'log', best: ['slack', 'jira', 'email'] },
     { id: 'json', app: 'text', title: 'An API response', blurb: 'JSON from curl or your browser tools.', html: '', text: JSON_TEXT, source: 'code', best: ['slack', 'jira', 'markdown'] },
     { id: 'mrkdwn', app: 'slack', title: 'Slack text with @mentions', blurb: 'Raw Slack text: @here, two people, a link, emoji, a list.', html: '', text: MRKDWN, source: 'slack-mrkdwn', best: ['jira', 'markdown', 'email'] },
-    { id: 'chips', app: 'gdocs', title: 'Docs action items', blurb: 'Google Docs people chips and a bulleted list.', html: chipsHtml, text: 'Action items from Monday\nPriya Shah sends the pricing draft by Friday\nSam Lee books the review room\nEveryone: read the refund policy before Thursday', source: 'gdocs', best: ['slack', 'jira', 'markdown'] },
+    { id: 'chips', app: 'gdocs', title: 'Google Docs action items', blurb: 'Google Docs people chips and a bulleted list.', html: chipsHtml, text: 'Action items from Monday\nPriya Shah sends the pricing draft by Friday\nSam Lee books the review room\nEveryone: read the refund policy before Thursday', source: 'gdocs', best: ['slack', 'jira', 'markdown'] },
     { id: 'notes', app: 'gdocs', title: 'Nested meeting notes', blurb: 'Bullets inside bullets, kept nested.', html: notesHtml, text: 'Launch review notes\nPricing\nAnnual plan gets 20% off\nFree tier stays at 3 projects\nSupport\nNew refund macro is live\nEscalations go to #support-leads\nOpen question: do we ship on Friday?', source: 'gdocs', best: ['slack', 'jira', 'markdown'] },
     { id: 'plan', app: 'markdown', title: 'An AI plan with a warning', blurb: 'A callout, a checklist, a table and a command.', html: '', text: PLAN, source: 'markdown', best: ['slack', 'jira', 'gdocs'] },
     { id: 'email', app: 'email', title: 'An email with a quoted reply', blurb: 'A Gmail reply that quotes the message above it.', html: emailHtml, text: 'Hi Sam,\n\nCan we move the review to Thursday? The numbers will not be ready before then.\n\nThanks,\nPriya\n\nOn Mon, 10 Nov 2026 at 09:14, Sam Lee <sam@example.com> wrote:\n> The review is Wednesday at 3pm. Please bring:\n> The Q3 numbers\n> A draft of the launch note', source: 'rich-text', best: ['slack', 'jira', 'markdown'] },
@@ -120,23 +120,23 @@ function extra() {
 const LAYOUT = [
   ['Tables and data', [
     ['sheet', 'Tab-separated cells become a real table, with an aligned plain-text copy riding along for apps that cannot show tables.'],
-    ['slack', 'Pasted back into Slack it is left alone. Pick Jira or Docs to see the @mention and the table converted.'],
+    ['slack', 'Pasted back into Slack it is left alone. Pick Jira or Google Docs to see the @mention and the table converted.'],
     ['json', 'Pretty-printed JSON lands as a code block, so the indentation is not flattened.']]],
   ['Code and logs', [
     ['code', 'The editor\'s colours and dark background are dropped. What arrives is a clean code block, indentation intact.'],
     ['logs', 'Every timestamp and the whole traceback stay on their own lines, in one code block.'],
     ['terminal', 'The prompt, colour codes and trailing spaces are removed.']]],
   ['People and mentions', [
-    ['mrkdwn', 'Slack\'s *bold*, _italic_ and <link|label> become real formatting in Jira and Docs. Mentions stay as names.'],
+    ['mrkdwn', 'Slack\'s *bold*, _italic_ and <link|label> become real formatting in Jira and Google Docs. Mentions stay as names.'],
     ['chips', 'Google Docs people chips become @Name with their email link behind them.']]],
   ['Lists and notes', [
     ['ai', 'Headings, a list, a table and code from an AI chat, converted for each app.'],
     ['plan', 'The warning, the checklist and the table each become the closest thing the app supports. The notes under the preview say what is left to do by hand.'],
     ['notes', 'Bullets inside bullets keep their nesting.']]],
   ['Whole pages', [
-    ['jira', 'Numbered steps, a table and a code block, ready for Slack or an email.'],
+    ['jira', 'Numbered steps, a table and a code block, ready for Slack or Outlook.'],
     ['confluence', 'Info and warning panels turn into callouts or labelled quotes, depending on what the app can show.'],
-    ['gdocs', 'A heading, a list and a table from Docs, ready for Jira or Markdown.'],
+    ['gdocs', 'A heading, a list and a table from Google Docs, ready for Jira or GitHub.'],
     ['github', 'The checklist, the shell snippet and the quote carry over.'],
     ['email', 'The quoted reply stays a quote.'],
     ['web', 'Links, the quote, inline code and numbered steps all carry over.']]],
