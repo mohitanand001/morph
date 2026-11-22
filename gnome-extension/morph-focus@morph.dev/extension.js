@@ -43,7 +43,7 @@ import { Slider } from 'resource:///org/gnome/shell/ui/slider.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const PILL_VERSION = 24;
+const PILL_VERSION = 25;
 const IFACE = `
 <node>
   <interface name="dev.morph.Focus">
@@ -1014,17 +1014,19 @@ export default class FormatBridgeHelper extends Extension {
   }
   // An app in the Apps pane: grip, mark, name, switch. Shown ones can be dragged.
   _appRow(a, ci, drag) {
-    const r = new St.BoxLayout({ style_class: 'fb-app-row' + (a.sw === 'on' ? '' : ' fb-off'), reactive: true, track_hover: true, x_expand: true });
+    const r = new St.BoxLayout({ style_class: 'fb-app-row' + (a.sw === 'off' ? ' fb-off' : ''), reactive: true, track_hover: true, x_expand: true });
     const box = new St.BoxLayout({ style_class: 'fb-app-box', x_expand: true });
     box.add_child(drag ? this._gl('drag_indicator', '#93a1a1', 18) : new St.Widget({ width: 18 }));
     box.add_child(this._chipDot(a));
     const nm = this._lbl('fb-app-name', a.label, 30);
     nm.x_expand = true;
     box.add_child(nm);
-    const t = new St.Button({ style_class: 'fb-swbtn', can_focus: false, reactive: true, track_hover: true, y_align: Clutter.ActorAlign.CENTER });
-    t.set_child(this._toggle(a.sw === 'on'));
-    t.connect('clicked', () => this._send(a.action));
-    box.add_child(t);
+    if (a.sw !== 'none') {
+      const t = new St.Button({ style_class: 'fb-swbtn', can_focus: false, reactive: true, track_hover: true, y_align: Clutter.ActorAlign.CENTER });
+      t.set_child(this._toggle(a.sw === 'on'));
+      t.connect('clicked', () => this._send(a.action));
+      box.add_child(t);
+    }
     r.add_child(box);
     if (drag) {
       r.connect('button-press-event', (_x, e) => {
@@ -1465,8 +1467,8 @@ export default class FormatBridgeHelper extends Extension {
         .forEach((x) => pane.add_child(sep(this._setRow('fb-opt', { dest: x.dest, label: x.label, action: x.action }, [this._toggle(x.sw === 'on')]))));
     } else if (Array.isArray(p.apps)) {
       const apps = p.apps.slice(0, 14).filter((x) => x && typeof x === 'object');
-      const on = apps.filter((x) => x.sw === 'on');
-      const off = apps.filter((x) => x.sw !== 'on');
+      const on = apps.filter((x) => x.sw !== 'off');
+      const off = apps.filter((x) => x.sw === 'off');
       // Shown apps: press and drag a row to move it (others slide to make room).
       this._editList = vbox({ style_class: 'fb-applist', x_expand: true });
       this._editRows = [];

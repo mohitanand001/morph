@@ -66,7 +66,7 @@ const norm = (t) => String(t == null ? '' : t).replace(/\r\n/g, '\n').replace(/\
 function createCore(io) {
   const FB = globalThis.FB;
   const log = io.log || (() => {});
-  const SETTINGS_DEFAULT = { rules: DEFAULT_RULES, pillEnabled: true, pillMode: 'always', pillYFrac: 0.42, pillSide: 'r', pillMonitor: -1, autoFormat: false, linkBack: false, crossLinks: true, tabIcons: false, theme: 'sol-light', size: 'm', shortcuts: null, pillDests: null, atlassianSite: '', seenDefaults: null, people: {}, updateCheck: true, readFrom: 'any', setupDone: false, lastCheck: 0, lastOk: 0, notifiedVersion: '' };
+  const SETTINGS_DEFAULT = { rules: DEFAULT_RULES, pillEnabled: true, pillMode: 'always', pillYFrac: 0.42, pillSide: 'r', pillMonitor: -1, autoFormat: false, linkBack: false, crossLinks: true, tabIcons: false, theme: 'sol-light', size: 'm', shortcuts: null, pillDests: null, atlassianSite: '', seenDefaults: null, people: {}, updateCheck: true, readFrom: 'any', setupDone: false, appOrder: null, lastCheck: 0, lastOk: 0, notifiedVersion: '' };
   let settings = Object.assign({}, SETTINGS_DEFAULT);
 
   let currentRule = null;
@@ -145,13 +145,23 @@ function createCore(io) {
   // for every supported tool; "Only these apps" reads and converts only in the apps switched on. Reads you ask for
   // with a click are always fine.
   const SETUP_APP_IDS = ['slack', 'jira', 'confluence', 'outlook', 'gdocs', 'notion', 'linear', 'teams', 'github', 'terminal'];
-  const setupApps = () => SETUP_APP_IDS.map((id) => settings.rules.find((r) => r.id === id)).filter(Boolean);
+  const appOrder = () => {
+    const o = (Array.isArray(settings.appOrder) ? settings.appOrder : []).filter((id, i, a) => SETUP_APP_IDS.includes(id) && a.indexOf(id) === i);
+    SETUP_APP_IDS.forEach((id) => { if (!o.includes(id)) o.push(id); });
+    return o;
+  };
+  const setupApps = () => appOrder().map((id) => settings.rules.find((r) => r.id === id)).filter(Boolean);
+  const shownApps = () => setupApps().filter((r) => allApps() || r.enabled);
   const allApps = () => settings.readFrom !== 'listed';
   const readsEverything = () => allApps();
   // In "All apps", every supported tool counts as one of your apps, whatever its switch says.
   const activeRules = () => (allApps() ? settings.rules.map((r) => (SETUP_APP_IDS.includes(r.id) ? Object.assign({}, r, { enabled: true }) : r)) : settings.rules);
   // The formats the pill offers: all of them, or only those of the apps switched on.
-  const offeredDests = () => (allApps() ? ALL_DESTS.slice() : ALL_DESTS.filter((d) => setupApps().some((r) => r.enabled && r.dest === d)));
+  const offeredDests = () => {
+    const out = [];
+    shownApps().forEach((r) => { if (ALL_DESTS.includes(r.dest) && !out.includes(r.dest)) out.push(r.dest); });
+    return out.length ? out : ALL_DESTS.slice();
+  };
   const logoOf = (r) => (r.id === 'github' || r.id === 'terminal' ? r.id : r.dest);
   // A name people recognise: the supported app it is (even when switched off), else a tidied app id.
   const appLabel = (w) => {
@@ -182,26 +192,37 @@ function createCore(io) {
   let ocrJob = null;     // { line } while the install runs
   let ocrFail = '';      // why the last install did not finish
   const ocrCanManage = () => !!(io.ocr && io.ocr.install && io.ocr.remove);
+  // Confirmations happen inside the pill (a system dialog would cover it and close it): one button asks, the
+  // next shows the question with the two answers right there.
+  let ocrAsk = '';       // 'on' | 'stop' | 'off' while a question is showing
   function ocrBlocks() {
     if (shellVersion < 15) return [];
+    const ask = (title, text, yes, yesAction, no) => [
+      { kind: 'panel', tone: 'warn', icon: 'warning', title, text },
+      { kind: 'buttons', buttons: [{ label: yes, action: yesAction, kind: 'primary' }, { label: no, action: 'ocr:no', kind: 'secondary' }] }];
     if (ocrJob) {
+      if (ocrAsk === 'stop') return ask('Stop installing?', 'What was downloaded so far is removed. You can start again later.', 'Stop', 'ocr:cancel', 'Keep installing');
       return [{ kind: 'status', tone: 'plain', icon: 'download', title: 'Installing table OCR…', items: [ocrJob.line || 'Starting…', 'About 1 GB, a few minutes. You can keep using your computer.'] },
-        { kind: 'buttons', buttons: [{ label: 'Stop installing', action: 'ocr:cancel', kind: 'secondary', confirm: { title: 'Stop installing table OCR?', body: 'What was downloaded so far is removed. You can start again later.', ok: 'Stop' } }] }];
+        { kind: 'buttons', buttons: [{ label: 'Stop installing', action: 'ocr:askstop', kind: 'secondary' }] }];
     }
     if (ocrReady()) {
+      if (ocrAsk === 'off' && ocrCanManage()) return ask('Remove table OCR?', 'This deletes the OCR files (about 1 GB). Morph keeps working without it.', 'Remove', 'ocr:off', 'Keep it');
       return [{ kind: 'panel', tone: 'ok', icon: 'check_circle', title: 'Table OCR is on', text: 'A copied image is read only when you pick an app, on this device. Nothing is uploaded.' },
-        ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Remove table OCR', action: 'ocr:off', kind: 'secondary', confirm: { title: 'Remove table OCR?', body: 'This deletes the OCR files (about 1 GB). Morph keeps working without it.', ok: 'Remove' } }] }] : [])];
+        ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Remove table OCR', action: 'ocr:askoff', kind: 'secondary' }] }] : [])];
     }
-    return [{ kind: 'panel', tone: ocrFail ? 'warn' : 'plain', icon: ocrFail ? 'warning' : 'grid_view', title: 'Table OCR (optional)',
+    if (ocrAsk === 'on' && ocrCanManage()) return ask('Download about 1 GB?', 'This installs PaddleOCR once and needs internet. Images are read only on this computer, and only when you pick an app.', 'Install', 'ocr:on', 'Not now');
+    return [{ kind: 'panel', tone: ocrFail ? 'warn' : 'plain', icon: ocrFail ? 'warning' : 'table', title: 'Table OCR (optional)',
         text: ocrFail ? ocrFail : 'Reads tables from copied screenshots, on this device. Off until you turn it on.' },
-      ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: ocrFail ? 'Try again' : 'Enable table OCR', action: 'ocr:on', kind: 'primary', confirm: { title: 'Enable table OCR?', body: 'This downloads and installs PaddleOCR (about 1 GB, one time) and needs internet. Images are read only on this device, and only when you pick an app.', ok: 'Install' } }] }] : [{ kind: 'panel', tone: 'plain', title: 'To turn it on', text: 'Run  morph --enable-ocr  in a terminal.' }])];
+      ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: ocrFail ? 'Try again' : 'Enable table OCR', action: 'ocr:ask', kind: 'primary' }] }] : [])];
   }
   function ocrAction(arg) {
+    if (arg === 'ask' || arg === 'askstop' || arg === 'askoff') { ocrAsk = arg === 'ask' ? 'on' : arg.slice(3); sendPill(); return; }
+    if (arg === 'no') { ocrAsk = ''; sendPill(); return; }
+    ocrAsk = '';
     if (arg === 'on' && ocrCanManage() && !ocrJob && !ocrReady()) {
       ocrFail = '';
       ocrJob = { line: 'Starting…', cancelled: false };
       const job = ocrJob;
-      pillView = 'ocr'; flash = { sub: '', tone: 'ok', open: true }; // the confirm dialog closed the pill: bring it back here
       sendPill();
       io.ocr.install((line) => { if (ocrJob === job && line) { job.line = String(line).slice(0, 110); sendPill(); } },
         (ok) => {
@@ -271,12 +292,10 @@ function createCore(io) {
     const sw = (on) => (on ? 'on' : 'off');
     if (cur === 'edit') {
       const on = allApps();
-      spec.pane = { title: 'Apps', lede: 'Where ' + APP_NAME + ' reads and converts your copies.',
-        opts: [{ icon: 'grid_view', label: 'All apps', sub: on ? 'On: every app, except password managers' : 'Off: only the apps switched on below', sw: sw(on), action: 'toggle:readfrom' }] };
-      if (on) spec.pane.blocks = [{ kind: 'panel', tone: 'plain', title: 'Converts for', items: [setupApps().map((r) => r.name).join(', ')] }];
-      else spec.pane.apps = setupApps().map((r) => ({ label: r.name, dest: logoOf(r), sw: r.enabled ? 'on' : 'off', action: 'rule:' + r.id, up: '', down: '' }));
-      spec.pane.appsFixed = true;
-      spec.pane.offLabel = 'Off';
+      spec.pane = { title: 'Apps', lede: 'Where ' + APP_NAME + ' works. Drag to reorder.',
+        opts: [{ icon: 'grid_view', label: 'All apps', sub: on ? 'On: every app, except password managers' : 'Off: only the apps switched on below', sw: sw(on), action: 'toggle:readfrom' }],
+        apps: setupApps().map((r) => ({ label: r.name, dest: logoOf(r), sw: on ? 'none' : (r.enabled ? 'on' : 'off'), action: on ? '' : 'rule:' + r.id })),
+        offLabel: 'Off' };
     } else if (cur === 'keys') {
       const KEY_SHORT = { paste: 'Paste, fixed', plain: 'Paste as plain text', pill: 'Open the pill', auto: 'Auto-format on/off', pdf: 'Save as PDF' };
       const KEY_ICON = { paste: 'content_paste', plain: 'notes', pill: 'grid_view', auto: 'bolt', pdf: 'description' };
@@ -355,8 +374,6 @@ function createCore(io) {
         opts: [
           { icon: 'bolt', label: 'Convert automatically', sub: 'Converts a copy when you switch to one of your apps', sw: sw(settings.autoFormat), action: 'toggle:auto' },
           { icon: 'link', label: 'Say where it came from', sub: 'Ends the paste with a line like “Source: Slack · #general”', sw: sw(settings.linkBack), action: 'toggle:link' },
-          { icon: 'public', label: 'Links from your copy', sub: 'The pill lists links, tickets and emails it finds, to open in one click', sw: sw(settings.crossLinks), action: 'toggle:crosslinks' },
-          { icon: 'grid_view', label: 'Quick buttons on the tab', sub: 'App buttons on the closed pill: one click converts', sw: sw(settings.tabIcons), action: 'toggle:tabicons' },
         ] };
       if (shellVersion < 12) {
         // An older helper only draws switches: keep the old two-click rows until it is updated.
@@ -700,8 +717,14 @@ function createCore(io) {
     sendPill();
   }
   function onSettingsAction(kind, arg) {
-    const list0 = () => (settings.pillDests || ALL_DESTS).slice();
-    const commit = (list) => { settings.pillDests = cleanDests(list); save(); sendPill(); };
+    const list0 = () => shownApps().map((r) => r.id);
+    const commit = (list) => {
+      const shown = list0();
+      if (list.length !== shown.length || !list.every((id) => shown.includes(id))) { sendPill(); return; }
+      let k = 0;
+      settings.appOrder = appOrder().map((id) => (shown.includes(id) ? list[k++] : id));
+      save(); sendPill();
+    };
     if (kind === 'view') pillView = PILL_PAGES.includes(arg) ? arg : 'main';
     if (kind === 'dswap' && /^\d{1,2}t\d{1,2}$/.test(arg)) {
       const list = list0();
@@ -727,7 +750,7 @@ function createCore(io) {
       if (list.length > 1 && Number(arg) < list.length) { list.splice(Number(arg), 1); commit(list); } else sendPill();
       return;
     }
-    if (kind === 'dadd' && ALL_DESTS.includes(arg)) { const list = list0(); if (!list.includes(arg)) list.push(arg); commit(list); return; }
+
     if (kind === 'size' && ['s', 'm', 'l'].includes(arg)) settings.size = arg;
     if (kind === 'key' && /^\d{1,2}$/.test(arg)) {
       const k = visibleKeys()[Number(arg)];
@@ -797,7 +820,7 @@ function createCore(io) {
     if (kind === 'key' && /^\d{1,2}$/.test(arg)) onSettingsAction('key', arg);
     if (kind === 'refresh') refreshClip();
     if (kind === 'setup' && /^(ok|settings)$/.test(arg)) finishWelcome(arg);
-    if (kind === 'ocr' && /^(on|off|cancel)$/.test(arg)) ocrAction(arg);
+    if (kind === 'ocr' && /^(on|off|cancel|ask|askstop|askoff|no)$/.test(arg)) ocrAction(arg);
     if (kind === 'update') runUpdate();
     if (kind === 'checkupdate') checkNow();
     if (kind === 'uninstall') askUninstall();

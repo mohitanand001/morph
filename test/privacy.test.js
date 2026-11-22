@@ -66,13 +66,16 @@ function desk(saved) {
     c.focus({ app: 'slack', title: 'x - Slack' }, 23);
     c.action('view:edit');
     let pane = d.last().pane;
-    check('Apps page: "All apps" is on by default, and lists what it converts for', pane.opts[0].label === 'All apps' && pane.opts[0].sw === 'on' && /Slack.*Terminal/.test(JSON.stringify(pane.blocks)) && !pane.apps);
+    check('Apps page: "All apps" is on, and the ten apps are listed without switches', pane.opts[0].label === 'All apps' && pane.opts[0].sw === 'on' && pane.apps.length === 10 && pane.apps.every((a) => a.sw === 'none'));
+    c.action('dput:0t2');
+    check('dragging reorders the apps, and the pill follows the order', JSON.parse(d.saved).appOrder.slice(0, 3).join() === 'jira,confluence,slack' && d.last().pane.apps[0].label === 'Jira');
+    c.action('dput:2t0');
     c.action('view:main');
     check('All apps: the pill offers every other format (Slack is the app in front)', ['jira', 'email', 'markdown', 'text', 'notion'].every((x) => JSON.stringify(d.last().options).includes('"dest":"' + x + '"')));
     c.action('view:edit');
     c.action('toggle:readfrom');
     pane = d.last().pane;
-    check('Only these apps: the ten apps with switches, the usual eight on', JSON.parse(d.saved).readFrom === 'listed' && pane.apps.length === 10 && pane.apps.filter((a) => a.sw === 'on').length === 8 && pane.apps.every((a) => /^rule:/.test(a.action)) && pane.appsFixed === true);
+    check('Only these apps: the ten apps with switches, the usual eight on', JSON.parse(d.saved).readFrom === 'listed' && pane.apps.length === 10 && pane.apps.filter((a) => a.sw === 'on').length === 8 && pane.apps.every((a) => /^rule:/.test(a.action)));
     check('the switches change the same list that decides reading', c.mayRead() === true);
     c.action('view:main');
     c.focus({ app: 'gnome-terminal-server', title: 'bash' }, 23);
