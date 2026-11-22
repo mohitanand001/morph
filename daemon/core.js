@@ -355,8 +355,9 @@ function createCore(io) {
             'Morph log files',
             'Start at login',
             'The tab on the screen edge (its GNOME helper)',
-            'The morph command' ] },
-          { kind: 'panel', tone: 'warn', icon: 'warning', title: 'This deletes your Morph settings', text: 'Nothing you copy is ever stored by Morph, so there is no clipboard data to lose. Your documents and other files are not touched.' },
+            'The morph command',
+            ...(ocrReady() || ocrJob ? ['Table OCR: PaddleOCR and its models in Morph\'s own folder'] : []) ] },
+          { kind: 'panel', tone: 'warn', icon: 'warning', title: 'This deletes your Morph settings', text: 'Nothing you copy is ever stored by Morph, so there is no clipboard data to lose. Your documents and other files are not touched.' + (ocrReady() || ocrJob ? ' A PaddleOCR you installed yourself, outside Morph, is not touched either.' : '') },
           { kind: 'buttons', buttons: io.uninstall ? [
             { label: 'Keep Morph', action: 'view:settings', kind: 'secondary' },
             { label: 'Uninstall Morph', action: 'uninstall:', kind: 'danger', confirm: { title: 'Uninstall Morph?', body: 'This removes Morph and its settings from this account. You can install it again later.', ok: 'Uninstall' } } ] : [{ label: 'Keep Morph', action: 'view:settings', kind: 'secondary' }] },

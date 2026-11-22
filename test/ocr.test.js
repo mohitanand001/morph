@@ -118,6 +118,12 @@ function desk(opts) {
     c.action('ocr:on');
     check('a second click does not start a second install', state.starts === 1);
     state.ready = true; state.installing.onDone(true);
+    c.action('view:uninstall');
+    {
+      const u = JSON.stringify(d.last().pane.blocks);
+      check('Uninstall lists the table OCR files with the rest, and says your own PaddleOCR stays', /Table OCR: PaddleOCR and its models in Morph's own folder/.test(u) && /PaddleOCR you installed yourself, outside Morph, is not touched/.test(u), u.slice(0, 300));
+    }
+    c.action('view:ocr');
     check('done: Table OCR is on, with Remove', /Table OCR is on/.test(blocks()) && /Remove table OCR/.test(blocks()));
     c.action('ocr:off');
     await new Promise((r) => setTimeout(r, 10));
