@@ -2,137 +2,207 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Morph: paste formatted content correctly anywhere</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Morph</title>
 <meta name="description" content="Morph re-shapes what you copy for the app you paste into: tables stay tables, lists stay lists. For GNOME on Linux. Your clipboard stays on your device.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
+/* Layout: a single centred column, a sticky step rail on wide screens, terminal blocks with real copy buttons.
+   Colour: ink-teal on warm paper, one teal accent; tactile buttons (solid lower edge, sinks on press). */
 :root{
-  --bg:#f7f1e1; --paper:#fffdf6; --fg:#0a3a45; --muted:#5b6f6f; --line:#ddd3b4;
-  --accent:#137b72; --accent-ink:#fff; --warn-bg:#fbefd2; --warn-line:#e3c36d; --code:#0d2f36; --code-fg:#e9f3ee;
+  --bg:#f7f1e1; --paper:#fffdf6; --fg:#0a3a45; --muted:#5b6f6f; --line:#ddd3b4; --edge:#cfc29a;
+  --accent:#137b72; --accent-ink:#ffffff; --code-bg:#0d2f38; --code-fg:#e8f3ef; --code-mute:#8fb3ad;
+  --warn-bg:#fbefd2; --warn-line:#e3c36d; --ok-bg:#dff3ec; --ok-line:#9fd3c3;
   --sans:'Manrope',system-ui,-apple-system,'Segoe UI',Ubuntu,sans-serif;
-  --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
-  color-scheme:light}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0b2229; --paper:#0f2d35; --fg:#e8f0ec; --muted:#9fb3b0; --line:#244850;
-  --accent:#36b5a8; --accent-ink:#06231f; --warn-bg:#3a3016; --warn-line:#7a6526; --code:#061a1f; --code-fg:#e9f3ee; color-scheme:dark}}
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b2229; --paper:#10303a; --fg:#e8f1ee; --muted:#9ab5b0; --line:#1f4a55; --edge:#07171c;
+  --accent:#3fc3b4; --accent-ink:#06262c; --code-bg:#071a20; --code-fg:#e8f3ef; --code-mute:#7ea39d;
+  --warn-bg:#3a3217; --warn-line:#8a7430; --ok-bg:#12403a; --ok-line:#2c7a6f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b2229; --paper:#10303a; --fg:#e8f1ee; --muted:#9ab5b0; --line:#1f4a55; --edge:#07171c;
+  --accent:#3fc3b4; --accent-ink:#06262c; --code-bg:#071a20; --code-fg:#e8f3ef; --code-mute:#7ea39d;
+  --warn-bg:#3a3217; --warn-line:#8a7430; --ok-bg:#12403a; --ok-line:#2c7a6f; color-scheme:dark}
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:17px;line-height:1.6}
-a{color:var(--accent)}
-.wrap{max-width:860px;margin:0 auto;padding:0 16px}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 0}
-.mark{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;color:var(--fg);text-decoration:none}
-.mark i{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:var(--accent)}
+body{background:var(--bg);color:var(--fg);font:16px/1.6 var(--sans);margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 72px}
+.wrap{max-width:860px;margin:0 auto}
+header{padding:56px 0 28px}
+.mark{display:inline-flex;align-items:center;gap:12px;font-weight:800;font-size:15px;letter-spacing:.02em}
+.mark i{width:36px;height:36px;border-radius:11px;background:var(--accent);display:grid;place-items:center}
 .mark svg{width:22px;height:22px;fill:var(--accent-ink)}
-nav{display:flex;gap:16px;font-weight:600;font-size:15px}
-nav a{text-decoration:none;color:var(--muted)} nav a:hover{color:var(--fg)}
-.hero{padding:40px 0 28px}
-.tag{display:inline-block;font-size:13px;font-weight:700;letter-spacing:.02em;padding:4px 10px;border-radius:999px;background:var(--warn-bg);border:1px solid var(--warn-line);margin-bottom:16px}
-h1{font-size:clamp(32px,6vw,52px);line-height:1.08;letter-spacing:-.02em;margin:0 0 16px;font-weight:800}
-.lede{font-size:clamp(18px,2.4vw,21px);color:var(--muted);max-width:640px;margin:0 0 28px}
-.cmd{display:flex;align-items:stretch;background:var(--code);color:var(--code-fg);border-radius:12px;overflow:hidden;max-width:100%}
-.cmd code{flex:1;font-family:var(--mono);font-size:14.5px;padding:14px 16px;overflow-x:auto;white-space:nowrap}
-.cmd button{border:0;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:700;font-size:14px;padding:0 18px;cursor:pointer}
-.cmd button:focus-visible{outline:3px solid var(--warn-line);outline-offset:-3px}
-.note{font-size:14.5px;color:var(--muted);margin:10px 0 0}
-.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
-.btn{display:inline-block;padding:10px 16px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--fg);font-weight:700;text-decoration:none;font-size:15px}
-.btn:hover{border-color:var(--accent)}
-section{padding:28px 0;border-top:1px solid var(--line)}
-h2{font-size:24px;margin:0 0 14px;letter-spacing:-.01em}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-@media (max-width:560px){.grid{grid-template-columns:1fr}}
-.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
-.card h3{margin:0 0 6px;font-size:17px}
-.card p{margin:0;color:var(--muted);font-size:15.5px}
-ol.steps{margin:0;padding-left:22px} ol.steps li{margin:6px 0}
-ul.plain{margin:0;padding-left:20px} ul.plain li{margin:6px 0}
-pre{background:var(--code);color:var(--code-fg);border-radius:10px;padding:12px 14px;overflow-x:auto;font-family:var(--mono);font-size:14px;margin:10px 0}
-code{font-family:var(--mono);font-size:.92em}
-p code, li code{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:1px 5px}
-footer{border-top:1px solid var(--line);padding:24px 0 40px;color:var(--muted);font-size:14px}
-@media (max-width:560px){nav{display:none} .cmd{flex-direction:column} .cmd button{padding:10px}}
+h1{font-size:clamp(34px,6vw,54px);line-height:1.05;margin:22px 0 14px;font-weight:800;letter-spacing:-.025em;text-wrap:balance}
+.lede{font-size:19px;max-width:60ch;color:var(--muted);margin:0 0 22px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-size:13px;font-weight:700;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--paper)}
+.dl{display:inline-block;margin:0 0 22px;font-weight:800;font-size:16px;text-decoration:none;color:var(--accent-ink);background:var(--accent);padding:12px 22px;border-radius:12px;box-shadow:0 3px 0 rgba(0,0,0,.3);transition:transform .08s,box-shadow .08s}
+.dl:active{transform:translateY(3px);box-shadow:0 0 0 rgba(0,0,0,.3)}
+.dl small{display:block;font-weight:500;font-size:12px;opacity:.85}
+.chip.soon{border-style:dashed;color:var(--muted)}
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-block:1px solid var(--line);margin-bottom:8px}
+nav .in{display:flex;gap:4px;overflow-x:auto;padding:8px 0}
+nav a{color:var(--fg);text-decoration:none;font-weight:700;font-size:14px;padding:7px 14px;border-radius:10px;white-space:nowrap}
+nav a:hover{background:var(--paper)}
+nav a:focus-visible,.copy:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+section{padding:40px 0 8px;scroll-margin-top:64px}
+h2{font-size:28px;line-height:1.15;margin:0 0 6px;letter-spacing:-.015em;text-wrap:balance}
+.sub{color:var(--muted);margin:0 0 22px;max-width:62ch}
+.step{display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 16px;margin:0 0 26px}
+.n{width:44px;height:44px;border-radius:13px;background:var(--paper);border:1px solid var(--line);box-shadow:0 2px 0 var(--edge);
+  display:grid;place-items:center;font-weight:800;font-size:18px;color:var(--accent)}
+.step h3{margin:6px 0 4px;font-size:18px;line-height:1.3}
+.step p{margin:0 0 10px;color:var(--muted)}
+.body{min-width:0}
+.term{background:var(--code-bg);color:var(--code-fg);border-radius:14px;margin:10px 0 0;position:relative;box-shadow:0 2px 0 var(--edge)}
+.term pre{margin:0;padding:16px 64px 16px 18px;overflow-x:auto;font:500 14px/1.7 var(--mono)}
+.term .c{color:var(--code-mute)}
+.copy{position:absolute;top:10px;right:10px;font:700 12px var(--sans);color:var(--accent-ink);background:var(--accent);border:0;border-radius:9px;
+  padding:6px 11px;cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,.35);transition:transform .08s,box-shadow .08s}
+.copy:active{transform:translateY(2px);box-shadow:0 0 0 rgba(0,0,0,.35)}
+.copy.done{background:var(--ok-bg);color:var(--fg)}
+.note{border:1px solid var(--warn-line);background:var(--warn-bg);border-radius:12px;padding:12px 16px;margin:14px 0;font-size:15px}
+.note.ok{border-color:var(--ok-line);background:var(--ok-bg)}
+.note b{font-weight:800}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:6px 0 4px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 2px 0 var(--edge)}
+.card h3{margin:0 0 6px;font-size:16px}
+.card p{margin:0;color:var(--muted);font-size:15px}
+details{background:var(--paper);border:1px solid var(--line);border-radius:14px;margin:12px 0;box-shadow:0 2px 0 var(--edge)}
+summary{cursor:pointer;font-weight:800;padding:14px 18px;list-style:none;display:flex;justify-content:space-between;gap:12px}
+summary::after{content:"+";color:var(--accent);font-size:20px;line-height:1}
+details[open] summary::after{content:"−"}
+details .in{padding:0 18px 16px;color:var(--muted)}
+details .in p{margin:0 0 10px}
+code{font:500 .9em var(--mono);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+@media (max-width:520px){.step{grid-template-columns:36px minmax(0,1fr);gap:4px 12px}.n{width:36px;height:36px;font-size:16px;border-radius:11px}header{padding-top:36px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.cta{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin:18px 0 22px}
+.cta .dl{margin:0}
+.ghost{display:inline-block;font-weight:800;font-size:15px;text-decoration:none;color:var(--fg);background:var(--paper);border:1px solid var(--line);padding:11px 18px;border-radius:12px;box-shadow:0 3px 0 var(--edge);transition:transform .08s,box-shadow .08s}
+.ghost:active{transform:translateY(3px);box-shadow:0 0 0 var(--edge)}
+.dl:focus-visible,.ghost:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+header .term{max-width:100%}
+ul.tight{margin:0 0 10px;padding-left:20px;color:var(--muted)} ul.tight li{margin:4px 0}
+
+.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:560px){.grid.two{grid-template-columns:1fr}}
+kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 6px}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header>
-  <a class="mark" href="./"><i><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h167q11-35 43-57.5t70-22.5q40 0 71.5 22.5T594-840h166q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm80-80h400v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm200-190q13 0 21.5-8.5T510-820q0-13-8.5-21.5T480-850q-13 0-21.5 8.5T450-820q0 13 8.5 21.5T480-790Z"/></svg></i>Morph</a>
-  <nav><a href="#install">Install</a><a href="try.html">Try it</a><a href="#privacy">Privacy</a><a href="https://github.com/mohitanand001/morph">GitHub</a></nav>
+  <div class="mark"><i><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h167q11-35 43-57.5t70-22.5q40 0 71.5 22.5T594-840h166q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm80-80h400v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm200-190q13 0 21.5-8.5T510-820q0-13-8.5-21.5T480-850q-13 0-21.5 8.5T450-820q0 13 8.5 21.5T480-790Z"/></svg></i>Morph</div>
+  <h1>Copy once. Paste right, anywhere.</h1>
+  <p class="lede">Morph sits on the edge of your screen and re-shapes what you copied for Slack, Jira, Confluence, Docs, Email, Markdown and more, so tables, lists and code survive the paste. Everything happens on your computer.</p>
+  <div class="term"><pre>curl -fsSL https://mohitanand001.github.io/morph/install.sh | bash</pre><button class="copy" type="button">Copy</button></div>
+  <div class="cta">
+    <a class="dl" href="try.html">Try it in your browser<small>copy a sample, pick an app, see what pastes</small></a>
+    <a class="ghost" href="https://github.com/mohitanand001/morph">Source on GitHub</a>
+  </div>
+  <div class="chips"><span class="chip">Version 0.15.0-rc.1 · testing</span><span class="chip">Linux · GNOME</span><span class="chip">Source available</span></div>
 </header>
 
-<div class="hero">
-  <span class="tag">Testing: release candidate 0.15.0-rc.1</span>
-  <h1>Copy from anywhere.<br>Paste it right.</h1>
-  <p class="lede">Morph re-shapes what you copy for the app you paste into. Tables stay tables, lists stay lists and code keeps its indentation, across Slack, Jira, Confluence, email, Google Docs and more. For GNOME on Linux.</p>
-  <div id="install" class="cmd"><code id="cmd">curl -fsSL https://mohitanand001.github.io/morph/install.sh | bash</code><button type="button" id="copy" aria-label="Copy the install command">Copy</button></div>
-  <p class="note">Paste it into a terminal. The installer checks the download against its fingerprint first. A short setup page opens by itself, and no log out is needed. <a href="install.sh">Read the installer</a>.</p>
-  <div class="cta"><a class="btn" href="try.html">Try it in your browser</a><a class="btn" href="https://github.com/mohitanand001/morph">Source on GitHub</a></div>
-</div>
+<nav aria-label="Sections"><div class="in"><a href="try.html">Try it</a><a href="#install">Install</a><a href="#use">Use</a><a href="#privacy">Privacy</a><a href="#ocr">Tables from images</a><a href="#update">Update</a><a href="#uninstall">Uninstall</a><a href="#help">Troubleshooting</a></div></nav>
 
-<section>
-  <h2>What it fixes</h2>
+<section id="install">
+  <h2>Install on Linux</h2>
+  <p class="sub">One command, a tiny download, and it uses what GNOME already has: no Node.js, no Electron. Made for Ubuntu and other GNOME desktops on Wayland. No log out needed.</p>
+
   <div class="grid">
+    <div class="card"><h3>You need</h3><p>Ubuntu, Fedora Workstation or another GNOME desktop, plus <code>curl</code> and <code>unzip</code>. GNOME's <code>gjs</code> is already part of it.</p></div>
+    <div class="card"><h3>What it adds</h3><p>The pill on your screen edge, a small GNOME helper and a <code>morph</code> command. No icon in the top bar.</p></div>
+    <div class="card"><h3>What it reads</h3><p>Your copies and the front window's app name, only on your computer and only as you allow in setup. Nothing is sent anywhere.</p></div>
+  </div>
+
+  <div class="step" style="margin-top:28px"><div class="n">1</div><div class="body">
+    <h3>Run the installer</h3>
+    <p>Paste this into a terminal. It downloads one zip, checks it against its fingerprint, and installs into your home folder. You can <a href="install.sh">read the installer</a> first.</p>
+    <div class="term"><pre>curl -fsSL https://mohitanand001.github.io/morph/install.sh | bash</pre><button class="copy" type="button">Copy</button></div>
+  </div></div>
+
+  <div class="step"><div class="n">2</div><div class="body">
+    <h3>Answer the short setup</h3>
+    <p>A three-step setup page opens by itself: where Morph should work (all apps, or only the ones you choose), when it converts, and daily update checks. Closing it keeps the recommended choices.</p>
+    <div class="note ok"><b>You should see</b> a slim tab on the right edge of the screen once setup is done. Check any time with <code>morph --status</code>.</div>
+  </div></div>
+
+  <div class="step"><div class="n">3</div><div class="body">
+    <h3>Prefer a package?</h3>
+    <p>A <a href="morph_0.15.0-rc.1_all.deb">.deb for Debian and Ubuntu</a> installs the same thing system-wide. Install it with <code>sudo apt install ./morph_0.15.0-rc.1_all.deb</code>, then open Morph from the app menu. Updates come from a newer .deb.</p>
+  </div></div>
+</section>
+
+<section id="use">
+  <h2>Use it</h2>
+  <p class="sub">The pill never takes focus, so the paste lands where you were.</p>
+  <div class="step"><div class="n">1</div><div class="body"><h3>Copy as usual</h3><p>From a spreadsheet, Slack, a web page, an AI chat, a terminal or a PDF.</p></div></div>
+  <div class="step"><div class="n">2</div><div class="body"><h3>Pick where it's going</h3><p>Click the tab on the screen edge (or press <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>F</kbd>) and choose the app you're pasting into.</p></div></div>
+  <div class="step"><div class="n">3</div><div class="body"><h3>Paste</h3><p>Press <kbd>Ctrl</kbd> <kbd>V</kbd>. Not right? Press <b>Undo</b> on the pill to put your original back. Or skip the pill entirely: <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>V</kbd> pastes fixed for the app you're in.</p></div></div>
+  <div class="grid two">
     <div class="card"><h3>Tables</h3><p>Spreadsheet ranges, Slack text tables, psql output and web tables become real tables in Jira, Confluence, email and Docs.</p></div>
     <div class="card"><h3>Lists</h3><p>Odd bullets, a) b) numbering and Outlook's fake lists become proper nested lists.</p></div>
     <div class="card"><h3>Code and terminal output</h3><p>Indentation and line breaks survive, and code lands as a code block.</p></div>
-    <div class="card"><h3>Right format for each app</h3><p>Each destination gets what it understands. If a paste already works, Morph leaves it alone and says so.</p></div>
+    <div class="card"><h3>Already fine?</h3><p>If a paste would already work, Morph leaves it alone and says so.</p></div>
   </div>
-</section>
-
-<section>
-  <h2>How you use it</h2>
-  <ol class="steps">
-    <li>Copy something as usual.</li>
-    <li>A small pill on the edge of the screen shows what you copied. Click the app you are pasting into.</li>
-    <li>Paste with Ctrl+V. If it didn't come out right, press <strong>Undo</strong> to put your original back.</li>
-  </ol>
-  <p class="note">Prefer no clicks? Turn on automatic conversion in setup or Settings, and Morph converts as you switch apps.</p>
 </section>
 
 <section id="privacy">
   <h2>Privacy</h2>
-  <ul class="plain">
-    <li>Morph never stores what you copy and never sends it anywhere. Everything happens on your computer.</li>
-    <li>It ignores password managers and copies that apps mark as secret. You can limit it to only the apps you choose.</li>
-    <li>Settings → Privacy shows what Morph read: the time, the app and the size, never the content.</li>
-    <li>The only network use is an optional daily update check and the optional table OCR download.</li>
-    <li>The code is open to read, so you can check all of this yourself.</li>
-  </ul>
+  <p class="sub">A clipboard tool sees a lot, so here is exactly what Morph does. The code is open, so you can check it.</p>
+  <div class="grid two">
+    <div class="card"><h3>Stays on your computer</h3><p>Morph never stores what you copy and never sends it anywhere. Conversion happens locally.</p></div>
+    <div class="card"><h3>You choose what it reads</h3><p>All apps, or only the apps you pick. Password managers and copies marked secret are always skipped.</p></div>
+    <div class="card"><h3>A log you can see</h3><p>Settings → Privacy lists what Morph read: the time, the app and the size, never the content.</p></div>
+    <div class="card"><h3>Network</h3><p>Only an optional daily update check and the optional table OCR download.</p></div>
+  </div>
 </section>
 
-<section>
-  <h2>Optional: tables from images</h2>
-  <p>Morph can read a table from a copied screenshot, on your device, only when you click. It's off by default because it downloads about 1 GB (PaddleOCR). Turn it on in Settings → Privacy → <strong>Enable table OCR</strong>, or run <code>morph --enable-ocr</code>.</p>
+<section id="ocr">
+  <h2>Tables from images (optional)</h2>
+  <p class="sub">Morph can read a table from a copied screenshot, on your computer, and only when you click an app. It's off by default because it downloads about 1 GB (PaddleOCR). Turn it on in Settings → Privacy → <b>Enable table OCR</b>, or run:</p>
+  <div class="term"><pre>morph --enable-ocr</pre><button class="copy" type="button">Copy</button></div>
 </section>
 
-<section>
-  <h2>Commands</h2>
-  <pre>morph --status      # is it running?
-morph --setup       # show the setup page again
-morph --restart
-morph --update
-morph --uninstall   # removes everything: program, helper, settings, logs</pre>
-  <p class="note">Needs GNOME (tested on Ubuntu with Wayland). A .deb for Debian and Ubuntu is also available: <a href="morph_0.15.0-rc.1_all.deb">morph_0.15.0-rc.1_all.deb</a>.</p>
+<section id="update">
+  <h2>Update</h2>
+  <p class="sub">Morph checks this page once a day if you allowed it in setup. To check yourself, open the pill, then Settings, then <b>Updates</b>. When there's a newer version, <b>Update now</b> installs it and restarts Morph, with no log out. Or from a terminal:</p>
+  <div class="term"><pre>morph --update</pre><button class="copy" type="button">Copy</button></div>
 </section>
 
-<section>
-  <h2>Found a problem?</h2>
-  <p>Please <a href="https://github.com/mohitanand001/morph/issues/new/choose">open an issue</a> with the two apps involved, what you copied and what you got. Include the output of <code>morph --status</code>. For security problems, see the <a href="https://github.com/mohitanand001/morph/security/policy">security policy</a>.</p>
+<section id="uninstall">
+  <h2>Uninstall</h2>
+  <p class="sub">Open the pill, then Settings, then <b>Uninstall</b>, or run the command below. It removes everything: the program, the GNOME helper, start-at-login, the command, your settings, logs, caches and the optional OCR files. Installed from the .deb? Run <code>sudo apt remove --purge morph</code>.</p>
+  <div class="term"><pre>morph --uninstall</pre><button class="copy" type="button">Copy</button></div>
 </section>
 
-<footer>
-  Morph is source-available under the <a href="https://github.com/mohitanand001/morph/blob/main/LICENSE">Functional Source License</a>. Slack, Jira, Confluence, Google Docs, Notion, Linear, Teams, Outlook and GitHub are trademarks of their owners; Morph is not affiliated with them.
-</footer>
+<section id="help">
+  <h2>Troubleshooting</h2>
+  <details><summary>The setup page or the pill doesn't appear</summary><div class="in">
+    <p>Run <code>morph --status</code>. If the app is running but nothing shows, switch the GNOME helper off and on: <code>gnome-extensions disable morph-focus@morph.dev; gnome-extensions enable morph-focus@morph.dev</code>.</p>
+    <p>To see the setup page again at any time, run <code>morph --setup</code>.</p></div></details>
+  <details><summary>The pill says "Skipped on purpose"</summary><div class="in"><p>You chose to let Morph read only some apps, and you copied from another one. Pick an app in the pill to convert it anyway, or switch on <b>Read copies from all apps</b> in Settings → Privacy.</p></div></details>
+  <details><summary>I closed the pill with the ✕</summary><div class="in"><p>Press <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>F</kbd>, or run <code>morph --restart</code>.</p></div></details>
+  <details><summary>"gjs is missing"</summary><div class="in"><p>It's part of GNOME, so this is rare. On Ubuntu run <code>sudo apt install gjs</code>, on Fedora <code>sudo dnf install gjs</code>.</p></div></details>
+  <details><summary>Where does it log?</summary><div class="in"><p>In <code>~/.cache/morph.log</code>. It never contains what you copied. For more detail, run <code>morph --stop</code>, then <code>FB_DEBUG=1 gjs -m ~/.local/share/morph/daemon/gjs-main.js</code> in a terminal.</p></div></details>
+  <details><summary>Report a problem</summary><div class="in"><p><a href="https://github.com/mohitanand001/morph/issues/new/choose">Open an issue on GitHub</a> with the two apps involved, what you copied and what you got, plus the output of <code>morph --status</code>. For security problems, use the <a href="https://github.com/mohitanand001/morph/security/policy">security policy</a> instead.</p></div></details>
+</section>
+
+<footer>Morph is independent, source-available software under the <a href="https://github.com/mohitanand001/morph/blob/main/LICENSE">Functional Source License</a>. Slack, Jira, Confluence, Google Docs, Notion, Linear, Microsoft Teams and other names and marks belong to their owners and appear only to say which app a format is for. Not affiliated with or endorsed by them.</footer>
 </div>
+
 <script>
-(function(){var b=document.getElementById('copy'),c=document.getElementById('cmd');if(!b||!c)return;
-b.addEventListener('click',function(){var t=c.textContent;var done=function(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1600)};
-try{navigator.clipboard.writeText(t).then(done,function(){sel()})}catch(e){sel()}
-function sel(){var r=document.createRange();r.selectNodeContents(c);var s=window.getSelection();s.removeAllRanges();s.addRange(r);b.textContent='Press Ctrl+C'}});})();
+document.querySelectorAll('.term').forEach(function(t){
+  var b=t.querySelector('.copy'), pre=t.querySelector('pre');
+  b.addEventListener('click',function(){
+    var text=pre.innerText.replace(/\s+# [^\n]*$/gm,'').replace(/\n+$/,'');
+    function ok(){b.textContent='Copied';b.classList.add('done');setTimeout(function(){b.textContent='Copy';b.classList.remove('done')},1500)}
+    function fallback(){var r=document.createRange();r.selectNodeContents(pre);var s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='Selected';setTimeout(function(){b.textContent='Copy'},1500)}
+    try{navigator.clipboard.writeText(text).then(ok,fallback)}catch(e){fallback()}
+  });
+});
 </script>
 </body>
 </html>
