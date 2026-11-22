@@ -8,7 +8,7 @@
 #   morph --update      fetch the newest version from the website and install it
 #   morph --status      is it running, is the GNOME helper installed
 #   morph --setup       show the welcome card again
-#   morph --enable-ocr  optional: read tables from copied images (installs RapidOCR for this account, ~200 MB)
+#   morph --enable-ocr  optional: read tables from copied images (installs RapidOCR for this account, ~400 MB)
 #   morph --disable-ocr remove that again
 #   morph --uninstall   remove everything: the program, helper, settings, logs, caches and this folder
 set -u
@@ -294,7 +294,7 @@ do_enable_ocr() {
   if [ -d "$OCR_DIR" ] && [ "$(cat "$OCR_DIR/engine" 2>/dev/null)" != rapidocr ]; then
     case "$OCR_DIR" in */morph-ocr) rm -rf "$OCR_DIR"; say "Removed the older, larger table OCR." ;; esac
   fi
-  say "Table OCR installs RapidOCR into $OCR_DIR (about 200 MB, one time, needs internet)."
+  say "Table OCR installs RapidOCR into $OCR_DIR (about 400 MB, one time, needs internet)."
   say "Nothing is sent anywhere when you use it. Remove it any time with:  morph --disable-ocr"
   mkdir -p "$OCR_DIR"
   # "Step n of 4" lines drive the progress bar in Settings → Images.

@@ -18,12 +18,16 @@ MAX_HTML = 400000
 
 def make_engine():
     """RapidOCR 2.x/3.x ("rapidocr" with onnxruntime), or the older "rapidocr_onnxruntime" package."""
+    # Text in a screenshot is never upside down, so the orientation check stays off: it turned "900" into "006".
     try:
         from rapidocr import RapidOCR
-        return "new", RapidOCR()
+        try:
+            return "new", RapidOCR(params={"Global.use_cls": False})
+        except Exception:  # noqa: BLE001 - an older 2.x without this setting
+            return "new", RapidOCR()
     except ImportError:
         from rapidocr_onnxruntime import RapidOCR
-        return "old", RapidOCR()
+        return "old", RapidOCR(use_cls=False)
 
 
 def as_list(v):
@@ -58,8 +62,9 @@ def count_cells(html):
 
 
 def grid_from_words(texts, boxes):
-    """Rebuild a table from where the words are: rows by height, columns by overlapping horizontal ranges.
-    On a clean screenshot of a grid this is more faithful than the table-structure model. None if it is not a grid."""
+    """Rebuild a table from where the words are. Rows: words at the same height. Columns: the horizontal ranges
+    of the full rows' cells, merged only where they overlap (neighbouring columns can sit a few pixels apart).
+    Lines that do not line up with those columns (a title, a logo) are left out. None if it is not a grid."""
     items = []
     for t, b in zip(texts, boxes):
         t = str(t).strip()
@@ -82,10 +87,35 @@ def grid_from_words(texts, boxes):
     most = max(len(r) for r in rows)
     if most < 2:
         return None
-    # The table is the longest run of rows with at least half as many words as the fullest row (titles drop out).
-    main = [len(r) >= max(2, (most + 1) // 2) for r in rows]
+    # Columns from the rows that have a word in every column (or nearly), merged only where they overlap.
+    full = [r for r in rows if len(r) == most]
+    if len(full) < 2:
+        full = [r for r in rows if len(r) >= max(2, most - 1)]
+    bands = []
+    for w in sorted((w for r in full for w in r), key=lambda i: i["x1"]):
+        if bands and w["x1"] < bands[-1][1]:
+            bands[-1][1] = max(bands[-1][1], w["x2"])
+        else:
+            bands.append([w["x1"], w["x2"]])
+    if len(bands) < 2:
+        return None
+
+    def inside(w):
+        """The column a word sits in, if it sits mostly inside one (None: it straddles columns or none)."""
+        width = w["x2"] - w["x1"]
+        for k, b in enumerate(bands):
+            if min(w["x2"], b[1]) - max(w["x1"], b[0]) >= 0.6 * width:
+                return k
+        return None
+
+    def nearest(w):
+        c = (w["x1"] + w["x2"]) / 2
+        return min(range(len(bands)), key=lambda k: 0 if bands[k][0] <= c <= bands[k][1] else min(abs(c - bands[k][0]), abs(c - bands[k][1])))
+
+    # The table is the longest run of rows whose words mostly sit inside the columns, with enough of them.
+    fits = [len(r) >= 2 and sum(inside(w) is not None for w in r) * 2 > len(r) for r in rows]
     best, cur = (0, 0), None
-    for i, ok in enumerate(main + [False]):
+    for i, ok in enumerate(fits + [False]):
         if ok and cur is None:
             cur = i
         elif not ok and cur is not None:
@@ -95,32 +125,39 @@ def grid_from_words(texts, boxes):
     rows = rows[best[0]:best[1]]
     if len(rows) < 2:
         return None
-    # Columns from the body (the header row can be wider or narrower than its column).
-    body = [w for r in (rows[1:] if len(rows) > 2 else rows) for w in r]
-    bands = []
-    for w in sorted(body, key=lambda i: i["x1"]):
-        if bands and w["x1"] <= bands[-1][1] + 0.3 * h:
-            bands[-1][1] = max(bands[-1][1], w["x2"])
-        else:
-            bands.append([w["x1"], w["x2"]])
-    if len(bands) < 2:
-        return None
-
-    def band_of(w):
-        def score(b):
-            overlap = min(w["x2"], b[1]) - max(w["x1"], b[0])
-            centre = abs((w["x1"] + w["x2"]) / 2 - (b[0] + b[1]) / 2)
-            return (overlap, -centre)
-        return max(range(len(bands)), key=lambda k: score(bands[k]))
-
     grid = []
     for r in rows:
         cells = [[] for _ in bands]
         for w in sorted(r, key=lambda i: i["x1"]):
-            cells[band_of(w)].append(w["t"])
+            k = inside(w)
+            cells[k if k is not None else nearest(w)].append(w["t"])
         grid.append([" ".join(c) for c in cells])
-    filled = sum(1 for r in grid for c in r if c) / float(len(grid) * len(bands))
+    # Columns nobody uses are dropped.
+    keep = [k for k in range(len(bands)) if any(r[k] for r in grid)]
+    grid = [[r[k] for k in keep] for r in grid]
+    if len(keep) < 2:
+        return None
+    grid = strip_sheet_labels(grid)
+    if len(grid) < 2 or len(grid[0]) < 2:
+        return None
+    filled = sum(1 for r in grid for c in r if c) / float(len(grid) * len(grid[0]))
     return grid if filled >= 0.6 else None
+
+
+def strip_sheet_labels(grid):
+    """A screenshot of a spreadsheet carries its column letters (A B C) and row numbers (1 2 3): leave them out.
+    Only when the letters row is there, so a real numbered column in an ordinary table stays."""
+    first = [c.strip() for c in grid[0]]
+    letters = [c for c in first if c]
+    if len(letters) < 2 or not all(len(c) == 1 and c.isalpha() and c.isupper() for c in letters):
+        return grid
+    if [ord(c) for c in letters] != list(range(ord(letters[0]), ord(letters[0]) + len(letters))):
+        return grid
+    body = grid[1:]
+    col = [r[0].strip() for r in body]
+    if not first[0] and col and all(c.isdigit() for c in col) and [int(c) for c in col] == list(range(int(col[0]), int(col[0]) + len(col))):
+        body = [r[1:] for r in body]
+    return body
 
 
 def grid_html(grid):
@@ -168,6 +205,8 @@ def selftest():
         words_of("old", (None, 0.1)) == ([], []),
         grid_from_words(["only", "words"], [[0, 0, 10, 5], [0, 20, 10, 25]]) is None,
         "<script>" not in grid_html([["<script>", "b"], ["1", "2"]]),
+        strip_sheet_labels([["", "A", "B"], ["1", "Item", "Qty"], ["2", "Pens", "10"]]) == [["Item", "Qty"], ["Pens", "10"]],
+        strip_sheet_labels([["#", "Name"], ["1", "Asha"], ["2", "Ravi"]]) == [["#", "Name"], ["1", "Asha"], ["2", "Ravi"]],
     ]
     print(json.dumps({"ok": all(checks), "checks": checks}))
     return 0 if all(checks) else 1

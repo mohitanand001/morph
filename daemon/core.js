@@ -210,13 +210,13 @@ function createCore(io) {
         { kind: 'buttons', buttons: [{ label: 'Stop installing', action: 'ocr:askstop', kind: 'secondary' }] }];
     }
     if (ocrReady()) {
-      if (ocrAsk === 'off' && ocrCanManage()) return ask('Remove table OCR?', 'This deletes the OCR files (about 200 MB). Morph keeps working without it.', 'Remove', 'ocr:off', 'Keep it');
+      if (ocrAsk === 'off' && ocrCanManage()) return ask('Remove table OCR?', 'This deletes the OCR files (about 400 MB). Morph keeps working without it.', 'Remove', 'ocr:off', 'Keep it');
       return [{ kind: 'panel', tone: 'ok', icon: 'check_circle', title: 'Table OCR is on', text: 'A copied image is read only when you pick an app, on this device. Nothing is uploaded.' },
         ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Remove table OCR', action: 'ocr:askoff', kind: 'secondary' }] }] : [])];
     }
-    if (ocrAsk === 'on' && ocrCanManage()) return ask('Download about 200 MB?', 'This installs RapidOCR once and needs internet. Images are read only on this computer, and only when you pick an app.' + (ocrLegacy() ? ' The older, larger table OCR (about 3 GB) is removed first.' : ''), 'Install', 'ocr:on', 'Not now');
+    if (ocrAsk === 'on' && ocrCanManage()) return ask('Download about 400 MB?', 'This installs RapidOCR once and needs internet. Images are read only on this computer, and only when you pick an app.' + (ocrLegacy() ? ' The older, larger table OCR (about 3 GB) is removed first.' : ''), 'Install', 'ocr:on', 'Not now');
     if (ocrLegacy()) {
-      return [{ kind: 'panel', tone: 'warn', icon: 'download', title: 'Table OCR got much smaller', text: 'The new version is about 200 MB instead of 3 GB, and reads a screenshot in about a second. Update to keep reading tables from images.' },
+      return [{ kind: 'panel', tone: 'warn', icon: 'download', title: 'Table OCR got much smaller', text: 'The new version is about 400 MB instead of 3 GB, and reads a screenshot in a few seconds. Update to keep reading tables from images.' },
         ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Update table OCR', action: 'ocr:ask', kind: 'primary' }] }] : [])];
     }
     return [{ kind: 'panel', tone: ocrFail ? 'warn' : 'plain', icon: ocrFail ? 'warning' : 'table', title: 'Table OCR (optional)',

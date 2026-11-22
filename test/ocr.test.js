@@ -127,7 +127,7 @@ function desk(opts) {
     const blocks = () => JSON.stringify(d.last().pane.blocks);
     check('off: the pane offers an Enable table OCR button', /Enable table OCR/.test(blocks()) && /ocr:ask/.test(blocks()) && !/confirm/.test(blocks()));
     c.action('ocr:ask');
-    check('asking happens inside Morph: about 200 MB, Install or Not now', /Download about 200 MB/.test(blocks()) && /RapidOCR/.test(blocks()) && /"Install"/.test(blocks()) && /Not now/.test(blocks()) && /ocr:on/.test(blocks()));
+    check('asking happens inside Morph: about 400 MB, Install or Not now', /Download about 400 MB/.test(blocks()) && /RapidOCR/.test(blocks()) && /"Install"/.test(blocks()) && /Not now/.test(blocks()) && /ocr:on/.test(blocks()));
     c.action('ocr:no');
     check('Not now goes back, nothing installed', /Enable table OCR/.test(blocks()) && !state.starts);
     c.action('ocr:ask'); c.action('ocr:on');
@@ -180,6 +180,14 @@ function desk(opts) {
     check('an older, larger install is offered an update to the small one', /Table OCR got much smaller/.test(b()) && /Update table OCR/.test(b()));
     c.action('ocr:ask');
     check('…and the question says the old one is removed first', /about 3 GB\) is removed first/.test(b()));
+  }
+  {
+    // Real RapidOCR output for a salary-sheet screenshot (title, logo, a 5-column grid): the table comes out exactly.
+    const words = require('./ocr/salary-sheet-words.json');
+    const py = 'import json,sys\nsys.path.insert(0, sys.argv[1])\nimport morph_ocr as m\nw=json.load(open(sys.argv[2]))\nprint(json.dumps(m.grid_from_words([x[0] for x in w],[x[1:] for x in w])))';
+    const r = require('child_process').spawnSync('python3', ['-I', '-c', py, require('path').join(__dirname, '..', 'ocr'), require('path').join(__dirname, 'ocr', 'salary-sheet-words.json')], { encoding: 'utf8' });
+    const grid = JSON.parse(r.stdout || 'null');
+    check('a real screenshot: five clean columns, title and logo left out', !!grid && grid.length === 8 && grid[0].join('|') === 'Employee Name|Basic|Allowances|Deductions|Net Salary' && grid[6].join('|') === 'Sarah Davis|4.200|900|100|5.000' && words.length > 40, r.stderr || JSON.stringify(grid));
   }
   console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed (ocr)');
   process.exit(failed ? 1 : 0);
