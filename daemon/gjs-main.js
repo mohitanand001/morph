@@ -209,7 +209,15 @@ const ocr = {
   },
   // Reads the copied image and returns { ok, html } or { ok: false, error }. Never leaves a copy of the image behind.
   async run() {
-    const img = await shell.readImage();
+    let img = await shell.readImage();
+    // Each read gets its own file, so one read can never delete the image another is still using.
+    if (img) {
+      try {
+        const own = img.replace(/(\.[a-z]+)?$/, '-' + Date.now() + '-' + Math.floor(Math.random() * 1e6) + '$1');
+        Gio.File.new_for_path(img).move(Gio.File.new_for_path(own), Gio.FileCopyFlags.OVERWRITE, null, null);
+        img = own;
+      } catch (e) { /* keep the original name */ }
+    }
     if (!img) { ocrLog('GNOME\'s helper could not hand over the copied image.'); return { ok: false, error: 'no_image' }; }
     try {
       const py = GLib.build_filenamev([OCR_DIR, 'venv', 'bin', 'python']);

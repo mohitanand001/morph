@@ -547,8 +547,16 @@ function createCore(io) {
   let ocrNote = '';      // why the last image read gave nothing
   let ocrFromImage = false; // the clip being converted was read from an image
   let ocrSeq = -1, ocrSeqClip = null;   // the copy an image was last read for, and its table (null: it failed)
-  async function readImageTable() {
-    if (ocrSeq === copySeq) return ocrSeqClip;
+  let ocrRunning = null;                 // { seq, promise } while a read is in progress
+  function readImageTable() {
+    if (ocrSeq === copySeq) return Promise.resolve(ocrSeqClip);
+    if (ocrRunning && ocrRunning.seq === copySeq) return ocrRunning.promise; // a second click joins the read in progress
+    const seq = copySeq;
+    const promise = readImageTableNow().finally(() => { if (ocrRunning && ocrRunning.promise === promise) ocrRunning = null; });
+    ocrRunning = { seq, promise };
+    return promise;
+  }
+  async function readImageTableNow() {
     ocrNote = '';
     if (!ocrReady()) return null;
     clipStatus = 'Reading the table…';

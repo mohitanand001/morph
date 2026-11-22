@@ -13,6 +13,9 @@ import os
 import re
 import sys
 
+# PaddlePaddle's oneDNN (MKLDNN) CPU path fails on some versions with
+# "ConvertPirAttribute2RuntimeAttribute not support": run without it (a little slower, and reliable).
+os.environ.setdefault("FLAGS_use_mkldnn", "0")
 if "--warmup" not in sys.argv:  # after the warm-up, no network checks
     os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 
@@ -72,9 +75,9 @@ def _make(cls, options):
 
 # Only what each reader uses: the table reader has no seal, formula or chart parts.
 PIPELINE_OPTIONS = {
-    "TableRecognitionPipelineV2": {"use_doc_orientation_classify": False, "use_doc_unwarping": False},
+    "TableRecognitionPipelineV2": {"use_doc_orientation_classify": False, "use_doc_unwarping": False, "enable_mkldnn": False},
     "PPStructureV3": {"use_doc_orientation_classify": False, "use_doc_unwarping": False, "use_seal_recognition": False,
-                      "use_formula_recognition": False, "use_chart_recognition": False},
+                      "use_formula_recognition": False, "use_chart_recognition": False, "enable_mkldnn": False},
 }
 
 
@@ -138,6 +141,7 @@ def selftest():
         count_cells("<table><tr><th>a</th><td>b</td></tr></table>") == 2,
         _make_drops_unknown(),
         "use_formula_recognition" not in PIPELINE_OPTIONS["TableRecognitionPipelineV2"],
+        all(o.get("enable_mkldnn") is False for o in PIPELINE_OPTIONS.values()) and os.environ.get("FLAGS_use_mkldnn") == "0",
     ]
     print(json.dumps({"ok": all(checks), "checks": checks}))
     return 0 if all(checks) else 1

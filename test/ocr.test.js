@@ -87,6 +87,14 @@ function desk(opts) {
     check('a table read once is reused for the next app', d.ocrRuns === 1 && d.writes.length === 2);
   }
   {
+    const d = desk({}); const c = createCore(d.io);
+    await c.start();
+    c.focus({ app: 'slack', title: 'x - Slack' }, 15);
+    c.action('fix:jira'); c.action('fix:confluence'); // the second click arrives while the first read runs
+    await new Promise((r) => setTimeout(r, 30));
+    check('two quick clicks share one read (no second read of the same image)', d.ocrRuns === 1);
+  }
+  {
     const d = desk({ ready: false }); const c = createCore(d.io);
     await c.start();
     c.focus({ app: 'slack', title: 'x - Slack' }, 15);
