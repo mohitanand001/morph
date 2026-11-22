@@ -57,16 +57,25 @@ def count_cells(html):
 
 
 def _make(cls, options):
-    """Build a pipeline with the options this PaddleOCR version knows; drop the ones it does not."""
+    """Build a pipeline with the options this PaddleOCR version knows; drop the ones it does not.
+    PaddleOCR reports an unknown option as a TypeError or a ValueError ("Unknown argument: x")."""
     opts = dict(options)
     while True:
         try:
             return cls(**opts)
-        except TypeError as e:
+        except (TypeError, ValueError) as e:
             bad = next((k for k in opts if k in str(e)), None)
             if not bad:
                 raise
             opts.pop(bad)
+
+
+# Only what each reader uses: the table reader has no seal, formula or chart parts.
+PIPELINE_OPTIONS = {
+    "TableRecognitionPipelineV2": {"use_doc_orientation_classify": False, "use_doc_unwarping": False},
+    "PPStructureV3": {"use_doc_orientation_classify": False, "use_doc_unwarping": False, "use_seal_recognition": False,
+                      "use_formula_recognition": False, "use_chart_recognition": False},
+}
 
 
 def build_pipeline():
@@ -79,8 +88,7 @@ def build_pipeline():
         except (ImportError, AttributeError) as e:
             errors.append(str(e))
             continue
-        return "v3", _make(cls, {"use_doc_orientation_classify": False, "use_doc_unwarping": False,
-                                 "use_seal_recognition": False, "use_formula_recognition": False, "use_chart_recognition": False})
+        return "v3", _make(cls, PIPELINE_OPTIONS[name])
     try:
         from paddleocr import PPStructure  # PaddleOCR 2.x
     except ImportError:
@@ -102,6 +110,20 @@ def read_table(path):
     return {"ok": True, "html": html, "cells": count_cells(html)}
 
 
+def _make_drops_unknown():
+    """A reader that rejects an option the way PaddleOCR 3 does is built without it."""
+    class Fake:
+        def __init__(self, **kw):
+            for k in kw:
+                if k not in ("use_doc_orientation_classify",):
+                    raise ValueError("Unknown argument: " + k)
+            self.kw = kw
+    try:
+        return _make(Fake, {"use_doc_orientation_classify": False, "use_formula_recognition": False}).kw == {"use_doc_orientation_classify": False}
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def selftest():
     v3 = [{"res": {"table_res_list": [{"pred_html": "<html><body><table><tr><td>a</td><td>b</td></tr></table></body></html>"}]}}]
     v2 = [{"type": "table", "res": {"html": "<table><tr><td>x</td></tr></table>"}}, {"type": "text", "res": [{"text": "hi"}]}]
@@ -114,6 +136,8 @@ def selftest():
         clean_table(v3[0]["res"]["table_res_list"][0]["pred_html"]) == "<table><tr><td>a</td><td>b</td></tr></table>",
         "script" not in clean_table(evil) and "onclick" not in clean_table(evil),
         count_cells("<table><tr><th>a</th><td>b</td></tr></table>") == 2,
+        _make_drops_unknown(),
+        "use_formula_recognition" not in PIPELINE_OPTIONS["TableRecognitionPipelineV2"],
     ]
     print(json.dumps({"ok": all(checks), "checks": checks}))
     return 0 if all(checks) else 1
