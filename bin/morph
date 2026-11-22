@@ -1,0 +1,340 @@
+#!/usr/bin/env bash
+# morph: install, start and stop Morph from anywhere.
+#
+#   morph --install     one-time setup (also after updating the files)
+#   morph --start       start it (restarts it if already running)
+#   morph --stop        quit it
+#   morph --restart     stop, then start
+#   morph --update      fetch the newest version from the website and install it
+#   morph --status      is it running, is the GNOME helper installed
+#   morph --setup       show the first-run setup page again
+#   morph --enable-ocr  optional: read tables from copied images (installs PaddleOCR for this account, ~1 GB)
+#   morph --disable-ocr remove that again
+#   morph --uninstall   remove everything: the program, helper, settings, logs, caches and this folder
+set -u
+
+# Follow the symlink in ~/.local/bin back to the real app folder.
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+APP_DIR="$(cd "$(dirname "$SELF")/.." && pwd)"
+EXT_UUID="morph-focus@morph.dev"
+EXT_SRC="$APP_DIR/gnome-extension/$EXT_UUID"
+EXT_DEST="${HOME}/.local/share/gnome-shell/extensions/$EXT_UUID"
+BIN_DIR="${HOME}/.local/bin"
+LOG="${XDG_CACHE_HOME:-$HOME/.cache}/morph.log"
+AUTOSTART="${XDG_CONFIG_HOME:-$HOME/.config}/autostart/morph.desktop"
+MAIN="$APP_DIR/daemon/gjs-main.js"
+# Installed from the .deb (files under /usr): the package puts the command on PATH and starts Morph at login,
+# so --install only sets up the per-user GNOME helper.
+IS_PKG=0
+case "$APP_DIR" in /usr/*|/opt/*) IS_PKG=1 ;; esac
+# Optional table OCR lives apart from the app folder so an update never throws it away.
+OCR_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/morph-ocr"
+UPDATE_URL="${MORPH_UPDATE_URL:-https://mohitanand001.github.io/morph/version.json}"
+
+say() { printf '%s\n' "$*"; }
+
+running() { pgrep -f "gjs.*$MAIN" >/dev/null 2>&1; }
+
+# The GNOME helper is installed in two parts: a tiny loader (extension.js, never changes) and the real
+# code under a name that carries its fingerprint (impl-XXXXXXXX.js). A new fingerprint can be loaded
+# by turning the extension off and on, which avoids a log out.
+ext_impl_name() { printf 'impl-%s.js' "$(sha256sum "$EXT_SRC/extension.js" | cut -c1-8)"; }
+ext_hot() { grep -q 'FB-LOADER' "$EXT_DEST/extension.js" 2>/dev/null; }
+ext_current() {
+  [ -d "$EXT_DEST" ] || return 1
+  ext_hot || return 1
+  [ "$(cat "$EXT_DEST/impl.txt" 2>/dev/null)" = "$(ext_impl_name)" ] && [ -f "$EXT_DEST/$(ext_impl_name)" ] || return 1
+  for f in metadata.json stylesheet.css; do
+    cmp -s "$EXT_SRC/$f" "$EXT_DEST/$f" || return 1
+  done
+}
+
+# The earlier, Electron-based version (if this account ever had it): stop it so the two never run together.
+retire_old() {
+  pkill -f "node_modules/electron" 2>/dev/null || true
+  rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/format-bridge.desktop"
+  rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/formatter.desktop"
+}
+
+do_stop() {
+  if running; then
+    pkill -f "gjs.*$MAIN" 2>/dev/null
+    sleep 0.5
+    say "Stopped."
+  else
+    say "Not running."
+  fi
+}
+
+do_start() {
+  command -v gjs >/dev/null 2>&1 || { say "GNOME's script runner (gjs) is missing. On Ubuntu:  sudo apt install gjs"; exit 1; }
+  [ -f "$MAIN" ] || { say "Not installed here. Run:  morph --install"; exit 1; }
+  retire_old
+  running && { pkill -f "gjs.*$MAIN" 2>/dev/null; sleep 0.5; }
+  mkdir -p "$(dirname "$LOG")"
+  cd "$APP_DIR" || exit 1
+  nohup gjs -m "$MAIN" >"$LOG" 2>&1 &
+  disown
+  sleep 1.5
+  if ! running; then
+    say "It stopped right away. Last lines of the log ($LOG):"
+    tail -n 8 "$LOG" 2>/dev/null | sed 's/^/    /'
+    exit 1
+  fi
+  say "Morph is running.  (log: $LOG)"
+  if command -v gnome-extensions >/dev/null 2>&1 && ! ext_current; then
+    say "Note: the GNOME helper is out of date. Run  morph --install  to update it."
+  fi
+}
+
+do_install() {
+  say "Installing Morph from $APP_DIR"
+  if ! command -v gjs >/dev/null 2>&1; then
+    say "GNOME's script runner (gjs) is needed. On Ubuntu, Fedora and most GNOME systems it is already there."
+    say "If not:  sudo apt install gjs   (Fedora: sudo dnf install gjs)"
+    exit 1
+  fi
+  if ! command -v gnome-extensions >/dev/null 2>&1; then
+    say "This version works on the GNOME desktop (Ubuntu's default, Fedora Workstation). It looks like this isn't GNOME."
+    exit 1
+  fi
+  retire_old
+
+  # A first install has no command, helper or autostart yet. Settings found then were left by an earlier
+  # uninstall, so they are stale: clear them, and the setup page shows as it should.
+  STALE_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/morph"
+  if [ -f "$STALE_CFG/settings.json" ] && [ ! -d "$EXT_DEST" ] && [ ! -e "$BIN_DIR/morph" ] && [ ! -f "$AUTOSTART" ]; then
+    rm -rf "$STALE_CFG"
+    say "- cleared settings left over from an earlier uninstall"
+  fi
+
+  if [ "$IS_PKG" = 0 ]; then
+  # The command itself, on your PATH.
+  chmod +x "$SELF"
+  mkdir -p "$BIN_DIR"
+  ln -sf "$SELF" "$BIN_DIR/morph"
+  say "- command installed: $BIN_DIR/morph"
+  case ":$PATH:" in
+    *":$BIN_DIR:"*) ;;
+    *)
+      if ! grep -qs 'morph PATH' "$HOME/.bashrc"; then
+        printf '\n# morph PATH\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$HOME/.bashrc"
+      fi
+      say "- added $BIN_DIR to PATH in ~/.bashrc (open a new terminal for it to count)"
+      ;;
+  esac
+  fi
+
+  # Settings from the earlier version, once.
+  NEW_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/morph"
+  if [ ! -f "$NEW_CFG/settings.json" ]; then
+    for old in "${XDG_CONFIG_HOME:-$HOME/.config}/formatter/settings.json" "${XDG_CONFIG_HOME:-$HOME/.config}/Format Bridge/settings.json" "${XDG_CONFIG_HOME:-$HOME/.config}/format-bridge/settings.json"; do
+      if [ -f "$old" ]; then mkdir -p "$NEW_CFG" && cp "$old" "$NEW_CFG/settings.json" && say "- kept your settings from the earlier version"; break; fi
+    done
+  fi
+
+  if [ "$IS_PKG" = 0 ]; then
+  # Start at login (a few seconds late, so GNOME has loaded its helper first).
+  mkdir -p "$(dirname "$AUTOSTART")"
+  printf '%s\n' '[Desktop Entry]' 'Type=Application' 'Name=Morph' 'Comment=Paste formatted content correctly anywhere' \
+    "Exec=gjs -m \"$MAIN\"" 'X-GNOME-Autostart-enabled=true' 'X-GNOME-Autostart-Delay=4' 'Terminal=false' > "$AUTOSTART"
+  say "- starts at login"
+  fi
+
+  # The GNOME helper (draws the pill, reads the clipboard, grabs the shortcuts).
+  NEEDS_LOGIN=0
+  if ext_current; then
+    say "- GNOME helper already up to date"
+  else
+    WAS_HOT=0; ext_hot && WAS_HOT=1
+    impl="$(ext_impl_name)"
+    if [ ! -d "$EXT_DEST" ]; then
+      # A new folder is built out of sight and moved into place in one step. GNOME loads an extension the moment
+      # its folder shows up (it may already be on its enabled list from an earlier install), so the folder must
+      # never be seen half-written.
+      STAGE="$(dirname "$(dirname "$EXT_DEST")")/.morph-stage.$$"
+      rm -rf "$STAGE"; mkdir -p "$STAGE" "$(dirname "$EXT_DEST")"
+      cp "$EXT_SRC/extension.js" "$STAGE/$impl"
+      cp "$EXT_SRC/loader.js" "$STAGE/extension.js"
+      cp "$EXT_SRC/metadata.json" "$EXT_SRC/stylesheet.css" "$STAGE/"
+      printf '%s' "$impl" > "$STAGE/impl.txt"
+      mv "$STAGE" "$EXT_DEST"
+    else
+      # An existing folder: real code and pointer first, the files GNOME looks at last.
+      cp "$EXT_SRC/extension.js" "$EXT_DEST/$impl"
+      cp "$EXT_SRC/stylesheet.css" "$EXT_DEST/"
+      printf '%s' "$impl" > "$EXT_DEST/impl.txt"
+      cp "$EXT_SRC/metadata.json" "$EXT_DEST/"
+      cp "$EXT_SRC/loader.js" "$EXT_DEST/extension.js"
+    fi
+    for old in "$EXT_DEST"/impl-*.js; do [ "$(basename "$old")" = "$impl" ] || rm -f "$old"; done
+    if [ "$WAS_HOT" = 1 ]; then
+      # The running helper can load the new code itself: off and on again, no log out.
+      gnome-extensions disable "$EXT_UUID" 2>/dev/null || true
+      sleep 0.5
+      gnome-extensions enable "$EXT_UUID" 2>/dev/null || true
+      sleep 0.5
+      say "- GNOME helper updated (no log out needed)"
+    else
+      # A brand-new extension: GNOME notices the folder after a moment, then it can be switched on, no log out.
+      # Try for up to ~12 s; if it never goes active we print the one command that switches it on.
+      NEEDS_LOGIN=1
+      i=0
+      while [ "$i" -lt 24 ]; do
+        gnome-extensions enable "$EXT_UUID" 2>/dev/null || true
+        if gnome-extensions info "$EXT_UUID" 2>/dev/null | grep -qE 'State:[[:space:]]*(ACTIVE|ENABLED)'; then NEEDS_LOGIN=0; break; fi
+        sleep 0.5; i=$((i + 1))
+      done
+      if [ "$NEEDS_LOGIN" = 0 ]; then say "- GNOME helper installed and switched on (no log out needed)"; else say "- GNOME helper installed"; fi
+    fi
+  fi
+  say ""
+  if [ "$NEEDS_LOGIN" = 1 ]; then
+    say "Done. GNOME hasn't switched the helper on yet. Run this once it has noticed it:"
+    say "  gnome-extensions enable $EXT_UUID"
+    # Already running (an update)? Restart it now so the new program is in use.
+    if running; then do_start; fi
+  else
+    do_start
+    say ""
+    say "Done."
+  fi
+}
+
+# Uninstall means gone: the program, its helper, its settings, logs, caches and the folder it runs from.
+# (The pill's Uninstall button runs this too; --purge is kept as the same thing under its old name.)
+do_uninstall() {
+  # Only ever delete a folder that really is Morph's.
+  if [ -f "$APP_DIR/daemon/gjs-main.js" ] && [ -f "$APP_DIR/bin/morph" ] && grep -q '"name": "morph"' "$APP_DIR/package.json" 2>/dev/null && [ "$APP_DIR" != "$HOME" ] && [ "$APP_DIR" != "/" ]; then
+    SAFE_DIR=1
+  else
+    SAFE_DIR=0
+  fi
+  do_stop
+  CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+  CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"
+  rm -f "$AUTOSTART" "$BIN_DIR/morph" "$BIN_DIR/formatter-linker" "$CFG/autostart/formatter.desktop" "$CFG/autostart/format-bridge.desktop"
+  # The GNOME helpers (this one and the old Formatter one): switch off, forget, delete.
+  for uuid in "$EXT_UUID" "format-bridge-focus@formatbridge.dev"; do
+    dir="$HOME/.local/share/gnome-shell/extensions/$uuid"
+    [ -d "$dir" ] && gnome-extensions disable "$uuid" 2>/dev/null || true
+    rm -rf "$dir"
+    if command -v gsettings >/dev/null 2>&1; then
+      for key in enabled-extensions disabled-extensions; do
+        cur="$(gsettings get org.gnome.shell "$key" 2>/dev/null || true)"
+        case "$cur" in *"$uuid"*) gsettings set org.gnome.shell "$key" "$(printf '%s' "$cur" | sed "s/'$uuid', *//; s/, *'$uuid'//; s/'$uuid'//")" 2>/dev/null || true ;; esac
+      done
+    fi
+  done
+  sed -i '/morph PATH/,+1d' "$HOME/.bashrc" 2>/dev/null || true
+  sed -i '/formatter-linker PATH/,+1d' "$HOME/.bashrc" 2>/dev/null || true
+  rm -rf "$CFG/morph" "$CFG/formatter" "$CFG/format-bridge" "$CFG/Format Bridge"
+  rm -f "$CACHE/morph.log" "$CACHE/formatter.log" "$CACHE/formatter-linker.log"
+  rm -rf "$CACHE/formatter-icons" "$OCR_DIR"
+  [ -n "${XDG_RUNTIME_DIR:-}" ] && rm -rf "$XDG_RUNTIME_DIR/morph"
+  if [ "$IS_PKG" = 1 ]; then
+    say "Removed Morph's helper, settings, logs and caches for this account."
+    if command -v pkexec >/dev/null 2>&1 && pkexec dpkg --purge morph >/dev/null 2>&1; then
+      say "Morph is gone: the program, its settings, logs and caches."
+    else
+      say "The program itself belongs to the system. To finish removing it, run:  sudo apt remove --purge morph"
+    fi
+  elif [ "$SAFE_DIR" = 1 ]; then
+    cd "$HOME" 2>/dev/null || cd /
+    rm -rf "$APP_DIR"
+    say "Morph is gone: the program, its settings, logs and caches."
+  else
+    say "Removed Morph's settings, helper and caches. Left $APP_DIR alone (it doesn't look like a Morph folder). Delete it yourself if you want."
+  fi
+  exit 0
+}
+
+json_field() { printf '%s' "$1" | sed -n "s/.*\"$2\": *\"\([^\"]*\)\".*/\1/p" | head -1; }
+
+# Fetch the newest version from the website, check its fingerprint, copy it over this folder, reinstall.
+do_update() {
+  if [ "$IS_PKG" = 1 ]; then
+    say "Morph was installed from a .deb. To update it, download the newer .deb and run:  sudo apt install ./morph_<version>_all.deb"
+    exit 1
+  fi
+  for t in curl unzip sha256sum; do command -v "$t" >/dev/null 2>&1 || { say "Needs '$t'. On Ubuntu:  sudo apt install curl unzip"; exit 1; }; done
+  cur="$(json_field "$(cat "$APP_DIR/package.json" 2>/dev/null)" version)"
+  meta="$(curl -fsSL --max-time 15 "$UPDATE_URL")" || { say "Couldn't reach the update page ($UPDATE_URL)."; exit 1; }
+  new="$(json_field "$meta" version)"; zip="$(json_field "$meta" zip)"; sha="$(json_field "$meta" sha256)"
+  [ -n "$new" ] && [ -n "$zip" ] && [ -n "$sha" ] || { say "The update page didn't look right."; exit 1; }
+  if [ "$new" = "$cur" ]; then say "Already up to date ($cur)."; exit 0; fi
+  say "Updating $cur -> $new"
+  case "$zip" in http*) url="$zip" ;; *) url="${UPDATE_URL%/*}/$zip" ;; esac
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  curl -fsSL --max-time 120 -o "$tmp/new.zip" "$url" || { say "Download failed."; exit 1; }
+  echo "$sha  $tmp/new.zip" | sha256sum -c --quiet - || { say "The download didn't match its fingerprint, so it was not installed."; exit 1; }
+  unzip -q "$tmp/new.zip" -d "$tmp/x" || { say "Couldn't unpack the download."; exit 1; }
+  [ -f "$tmp/x/morph/daemon/gjs-main.js" ] || { say "The download didn't contain Morph."; exit 1; }
+  cp -r "$tmp/x/morph/." "$APP_DIR/"
+  chmod +x "$APP_DIR/bin/morph"
+  say "Files replaced."
+  [ -n "${FB_NO_INSTALL:-}" ] && exit 0
+  rm -rf "$tmp"; trap - EXIT
+  exec "$APP_DIR/bin/morph" --install
+}
+
+
+# Optional: read tables out of copied images with PaddleOCR. Private Python environment in one folder, removed by
+# --disable-ocr. The only network use is this install: the packages from PyPI and the models, once. After that
+# Morph runs it offline, and only when you click.
+do_enable_ocr() {
+  command -v python3 >/dev/null 2>&1 || { say "Needs python3. On Ubuntu:  sudo apt install python3 python3-venv"; exit 1; }
+  python3 -c 'import venv, ensurepip' 2>/dev/null || { say "Needs python3-venv. On Ubuntu:  sudo apt install python3-venv"; exit 1; }
+  say "Table OCR installs PaddleOCR into $OCR_DIR (about 1 GB, one time, needs internet)."
+  say "Nothing is sent anywhere when you use it. Remove it any time with:  morph --disable-ocr"
+  mkdir -p "$OCR_DIR"
+  [ -x "$OCR_DIR/venv/bin/python" ] || python3 -m venv "$OCR_DIR/venv" || { say "Could not create the Python environment."; exit 1; }
+  "$OCR_DIR/venv/bin/python" -m pip install --quiet --upgrade pip || true
+  say "Installing PaddleOCR (this takes a few minutes)..."
+  "$OCR_DIR/venv/bin/python" -m pip install --quiet "paddlepaddle>=3.0,<4" "paddleocr>=3.0,<4" || { say "The install failed. Nothing was changed in Morph."; rm -rf "$OCR_DIR"; exit 1; }
+  say "Downloading the table models (one time)..."
+  PADDLE_PDX_CACHE_HOME="$OCR_DIR/models" "$OCR_DIR/venv/bin/python" "$APP_DIR/ocr/morph_ocr.py" --warmup | grep -q '"ok": true' || { say "Could not load the models. Run this again when you are online."; rm -rf "$OCR_DIR"; exit 1; }
+  : > "$OCR_DIR/ready"
+  say "Table OCR is on. Copy a screenshot of a table, then click an app in the pill."
+  exit 0
+}
+do_disable_ocr() {
+  case "$OCR_DIR" in */morph-ocr) rm -rf "$OCR_DIR"; say "Table OCR removed." ;; *) say "Refusing to remove $OCR_DIR"; exit 1 ;; esac
+  exit 0
+}
+
+do_status() {
+  if running; then say "App:    running"; else say "App:    not running"; fi
+  if command -v gnome-extensions >/dev/null 2>&1; then
+    if ext_current; then say "Helper: installed, up to date"; else say "Helper: missing or out of date (run --install)"; fi
+    gnome-extensions info "$EXT_UUID" 2>/dev/null | grep -i "state" | sed 's/^ */Helper: /'
+  fi
+  if [ -f "$OCR_DIR/ready" ]; then say "Table OCR: on"; else say "Table OCR: off (morph --enable-ocr to turn it on)"; fi
+}
+
+# Forget that setup was answered and start again: the setup page opens as it did on the first run.
+do_setup() {
+  f="${XDG_CONFIG_HOME:-$HOME/.config}/morph/settings.json"
+  do_stop >/dev/null 2>&1 || true
+  if [ -f "$f" ]; then sed -i 's/"setupDone": *true/"setupDone": false/' "$f"; fi
+  do_start
+  say "The setup page opens now."
+}
+
+case "${1:-}" in
+  --setup)     do_setup ;;
+  --install)   do_install ;;
+  --session)   do_install ;;
+  --start)     do_start ;;
+  --stop)      do_stop ;;
+  --restart)   do_stop; do_start ;;
+  --update)    do_update ;;
+  --status)    do_status ;;
+  --enable-ocr)  do_enable_ocr ;;
+  --disable-ocr) do_disable_ocr ;;
+  --uninstall) do_uninstall ;;
+  --purge)     do_uninstall ;;
+  -h|--help|"") sed -n '2,13p' "$SELF" | sed 's/^# \{0,1\}//' ;;
+  *) say "Unknown option: $1"; say "Try:  morph --help"; exit 2 ;;
+esac

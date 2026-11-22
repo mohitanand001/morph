@@ -1,0 +1,25 @@
+{
+  "name": "Terminal copy starting at a prompt",
+  "real": true,
+  "captured": "2026-11-08 from GNOME Terminal (text only)",
+  "html": "",
+  "text": "priya@laptop:~/Documents/work$ ls -la\ntotal 64860\ndrwxrwxr-x 35 priya priya     4096 Nov  7 12:39 .\ndrwxr-xr-x  5 priya priya     4096 Mar 14  2026 ..\n-rw-rw-r--  1 priya priya 15435161 Dec  2  2025 notes.pdf\ndrwxrwxr-x  4 priya priya     4096 Nov 30  2025 projects\n",
+  "expect": {
+    "source": "terminal",
+    "mentions": [],
+    "tables": 0,
+    "skipWords": true,
+    "contains": {
+      "github": [
+        "```bash\n$ ls -la"
+      ],
+      "text": [
+        "$ ls -la",
+        "notes.pdf"
+      ]
+    },
+    "excludes": [
+      "priya@laptop"
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "Tab-separated text copied from a spreadsheet (synthetic)",
+  "real": false,
+  "html": "",
+  "text": "Name\tQty\tPrice\nApple\t3\t1.5\nPear\t10\t2\n",
+  "expect": {
+    "source": "plain-text",
+    "mentions": [],
+    "tables": 1,
+    "contains": {
+      "jira": [
+        "<th>Name</th>",
+        "<td>Apple</td>"
+      ],
+      "gdocs": [
+        "<table"
+      ],
+      "github": [
+        "| Name | Qty | Price |"
+      ],
+      "text": [
+        "Name  | Qty | Price"
+      ],
+      "slack": [
+        "<table",
+        "<td>Apple</td>"
+      ]
+    },
+    "excludes": []
+  }
+}

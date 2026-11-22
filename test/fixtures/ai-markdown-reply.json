@@ -1,0 +1,58 @@
+{
+  "name": "Whole-reply markdown copied from an AI chat (synthetic)",
+  "real": false,
+  "html": "",
+  "text": "## Release notes\n\nThis **ships** today with a [runbook](https://example.com/run).\n\n- first item\n- second item\n\n| Service | Status |\n|---|---|\n| api | up |\n| db | down |\n\n```python\ndef add(a, b):\n    return a + b\n```\n",
+  "expect": {
+    "source": "markdown",
+    "mentions": [],
+    "tables": 1,
+    "contains": {
+      "jira": [
+        "<h2>",
+        "<th>Service</th>",
+        "<strong>ships</strong>"
+      ],
+      "gdocs": [
+        "<h2>",
+        "<table"
+      ],
+      "slack": [
+        "*ships*",
+        "runbook",
+        "<table",
+        "<td><b>Service</b></td>",
+        "<td>api</td>"
+      ],
+      "github": [
+        "## Release notes",
+        "```python",
+        "    return a + b"
+      ],
+      "text": [
+        "Release notes",
+        "runbook (https://example.com/run)",
+        "- first item",
+        "    return a + b"
+      ]
+    },
+    "excludes": [],
+    "excludesIn": {
+      "jira": [
+        "**ships**"
+      ],
+      "gdocs": [
+        "**ships**"
+      ],
+      "slack": [
+        "**ships**"
+      ],
+      "text": [
+        "**ships**"
+      ]
+    },
+    "ignoreWords": [
+      "python"
+    ]
+  }
+}

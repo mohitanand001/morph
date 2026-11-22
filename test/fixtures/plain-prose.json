@@ -1,0 +1,22 @@
+{
+  "name": "Ordinary prose with a dollar sign and an email (must stay plain)",
+  "real": false,
+  "html": "",
+  "text": "Mail me@x.com: it costs $ 5 a month\nand that is all\nthank you very much\n",
+  "expect": {
+    "source": "plain-text",
+    "mentions": [],
+    "tables": 0,
+    "contains": {
+      "github": [
+        "Mail me@x.com"
+      ],
+      "text": [
+        "it costs $ 5 a month"
+      ]
+    },
+    "excludes": [
+      "```"
+    ]
+  }
+}

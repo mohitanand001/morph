@@ -1,0 +1,17 @@
+{
+  "name": "server log with a Python traceback (made up)",
+  "real": false,
+  "html": "",
+  "text": "2026-11-14 09:12:03 INFO  checkout-api  order 48213 created (3 items)\n2026-11-14 09:12:04 WARN  checkout-api  payment gateway slow: 2.4s\n2026-11-14 09:12:07 ERROR checkout-api  payment failed for order 48213\nTraceback (most recent call last):\n  File \"app/payments.py\", line 88, in charge\n    resp = gateway.post(url, json=body, timeout=2)\n  File \"requests/api.py\", line 59, in post\n    return request(\"post\", url, **kwargs)\nrequests.exceptions.ReadTimeout: Read timed out. (read timeout=2)\n2026-11-14 09:12:07 INFO  checkout-api  order 48213 moved to retry queue",
+  "expect": {
+    "source": "log",
+    "mentions": [],
+    "tables": 0,
+    "contains": {
+      "github": ["```\n2026-11-14 09:12:03 INFO", "  File \"app/payments.py\", line 88, in charge\n    resp = gateway.post"],
+      "jira": ["```\n2026-11-14 09:12:03 INFO", "**kwargs"],
+      "text": ["Traceback (most recent call last):\n  File \"app/payments.py\""]
+    },
+    "excludes": []
+  }
+}

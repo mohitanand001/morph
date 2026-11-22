@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; frame-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'" />
+<title>Morph</title>
+<link rel="stylesheet" href="app.css" />
+</head>
+<body data-dest="slack">
+  <header class="bar">
+    <div class="brand"><img class="mark" src="icon.svg" alt="" aria-hidden="true" /><span class="name">Morph</span><span class="ver" id="ver"></span></div>
+    <div class="bar-actions">
+            <button id="read-btn" class="btn" type="button" title="Read clipboard (Ctrl R)" hidden>Read clipboard</button>
+      <button id="clear-btn" class="btn ghost" type="button" hidden>Clear</button>
+      <button id="apps-btn" class="btn ghost" type="button" title="Look, apps and pill settings" hidden>Settings</button>
+      <button id="hide-btn" class="btn ghost icon" type="button" aria-label="Hide" title="Hide (Esc)" hidden>✕</button>
+    </div>
+  </header>
+
+  <section class="apps-panel" id="apps-panel" aria-label="Settings" hidden>
+    <nav class="snav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+      <h2 class="snav-title">Settings</h2>
+      <button class="snav-btn" role="tab" id="nav-general" data-pane="general" data-icon="tune" aria-selected="true" aria-controls="spane-general">General</button>
+      <button class="snav-btn" role="tab" id="nav-apps" data-pane="apps" data-icon="grid_view" aria-selected="false" aria-controls="spane-apps">Apps</button>
+      <button class="snav-btn" role="tab" id="nav-keys" data-pane="keys" data-icon="keyboard" aria-selected="false" aria-controls="spane-keys">Shortcuts</button>
+      <button class="snav-btn" role="tab" id="nav-look" data-pane="look" data-icon="palette" aria-selected="false" aria-controls="spane-look">Appearance</button>
+      <button class="snav-btn" role="tab" id="nav-size" data-pane="size" data-icon="aspect_ratio" aria-selected="false" aria-controls="spane-size">Size</button>
+      <button class="snav-btn" role="tab" id="nav-about" data-pane="about" data-icon="info" aria-selected="false" aria-controls="spane-about">About</button>
+      <button id="apps-done" class="btn small snav-done" type="button">Done</button>
+    </nav>
+    <div class="spanes" id="spanes">
+      <div class="spane" id="spane-general" role="tabpanel" aria-labelledby="nav-general">
+        <h3>General</h3>
+        <p class="muted small" id="apps-detect"></p>
+        <fieldset class="mode">
+          <legend class="sr-only">Pill mode</legend>
+          <label><input type="radio" name="pill-mode" value="apps" /> Only in the apps below</label>
+          <label><input type="radio" name="pill-mode" value="always" /> In every app</label>
+          <label><input type="checkbox" id="pill-on" /> Show the pill</label>
+          <label title="When you switch into one of these apps, what you copied is converted for it, so a plain paste comes out right."><input type="checkbox" id="auto-on" /> Auto-format when I switch apps</label>
+      <label title="Copying from a Slack channel into a Jira issue? The pasted copy ends with “Source: Slack · #channel”, linked when the address is known."><input type="checkbox" id="link-on" /> Add a link back to where I copied from</label>
+        </fieldset>
+        <p class="add-title">Apps the pill appears in</p>
+        <ul class="rules" id="rules"></ul>
+        <form class="add-rule" id="add-rule">
+          <p class="add-title">Add an app</p>
+          <div class="add-grid">
+            <input id="add-name" placeholder="Name, e.g. Figma" required maxlength="40" />
+            <input id="add-title" placeholder="Window title contains…" maxlength="80" />
+            <input id="add-app" placeholder="or app id (e.g. notion)" maxlength="80" />
+            <select id="add-dest" aria-label="Destination">
+              <option value="slack">Slack</option><option value="jira">Jira</option><option value="confluence">Confluence</option>
+              <option value="email">Email</option><option value="gdocs">Docs</option><option value="markdown" selected>Markdown</option><option value="text">Text</option>
+              <option value="notion">Notion</option><option value="linear">Linear</option><option value="teams">Teams</option>
+            </select>
+          </div>
+          <button class="btn small" type="submit">Add</button>
+          <p class="muted small" id="current-win"></p>
+        </form>
+        <div class="set-block" id="people-block">
+          <p class="add-title">People · email for @mentions</p>
+          <p class="muted small">@mentions don’t carry an email, so add one here and pasted names become mail links (Docs, Gmail, Jira keep them). Names from what you just copied are listed first.</p>
+          <ul class="people" id="people"></ul>
+        </div>
+      </div>
+      <div class="spane" id="spane-apps" role="tabpanel" aria-labelledby="nav-apps" hidden>
+        <h3>Apps</h3>
+        <p class="muted small">Reorder and select Apps. Drag a row, or use the arrows. The pill shows them in this order.</p>
+        <ul class="dlist" id="pill-dests"></ul>
+      </div>
+      <div class="spane" id="spane-keys" role="tabpanel" aria-labelledby="nav-keys" hidden>
+        <h3>Shortcuts</h3>
+        <p class="muted small" id="keys-note">Click a key combination, then press the new one. Esc cancels.</p>
+        <ul class="keys" id="keys"></ul>
+      </div>
+      <div class="spane" id="spane-look" role="tabpanel" aria-labelledby="nav-look" hidden>
+        <h3>Appearance</h3>
+        <div class="cards" id="theme-cards" role="radiogroup" aria-label="Appearance"></div>
+      </div>
+      <div class="spane" id="spane-size" role="tabpanel" aria-labelledby="nav-size" hidden>
+        <h3>Size</h3>
+        <div class="cards" id="size-cards" role="radiogroup" aria-label="Pill size"></div>
+      </div>
+      <div class="spane" id="spane-about" role="tabpanel" aria-labelledby="nav-about" hidden>
+        <h3>About</h3>
+        <p><strong>Morph</strong> <span class="muted" id="about-ver"></span></p>
+        <p class="muted small">Copy from one app, paste into another, and keep the formatting. Everything happens on your computer: nothing you copy is sent anywhere or stored.</p>
+        <p class="muted small">Slack, Jira, Confluence, Google Docs, Notion, Linear, Markdown and other names and logos are trademarks of their owners and are used only to say which app a format is for. Morph is not affiliated with, endorsed by or sponsored by any of them. App marks are from Simple Icons (CC0); interface icons are Google Material Symbols (Apache-2.0).</p>
+      </div>
+    </div>
+  </section>
+
+  <main class="cols">
+    <!-- ======================= FROM ======================= -->
+    <section class="col from" aria-label="Source">
+      <div class="col-head">
+        <h2>From</h2>
+        <select id="source-select" aria-label="Source" hidden>
+          <option value="slack">Slack</option>
+          <option value="atlassian">Jira or Confluence</option>
+          <option value="gdocs">Google Docs</option>
+          <option value="github">GitHub</option>
+          <option value="outlook">Outlook or Word</option>
+          <option value="rich-text">Web page or app</option>
+          <option value="code-editor">Code editor</option>
+          <option value="code">Code (plain text)</option>
+          <option value="terminal">Terminal output</option>
+          <option value="log">Log output</option>
+          <option value="ai-chat">AI chat (Claude, ChatGPT)</option>
+          <option value="markdown">Markdown</option>
+          <option value="slack-mrkdwn">Slack message text</option>
+          <option value="pdf">PDF</option>
+          <option value="plain-text">Plain text</option>
+        </select>
+        <div class="tabs" role="tablist" aria-label="Source view">
+          <button role="tab" id="tab-content" aria-selected="true" aria-controls="pane-content">Content</button>
+          <button role="tab" id="tab-inspect" aria-selected="false" aria-controls="pane-inspect">Clipboard inspector</button>
+        </div>
+      </div>
+      <p class="from-meta" id="from-meta"></p>
+      <ul class="repairs" id="repairs" hidden></ul>
+
+      <div id="pane-content" role="tabpanel" aria-labelledby="tab-content" class="pane">
+        <div class="input-wrap">
+          <div id="input-box" class="input" contenteditable="plaintext-only" spellcheck="false" role="textbox" aria-multiline="true" aria-label="Source content"></div>
+          <div id="empty-hint" class="empty-hint" aria-hidden="true">
+            <p class="empty-title" id="empty-title">Copy something, then paste it here</p>
+            <p class="empty-sub" id="empty-sub">From Slack, Jira, Confluence, Outlook, Google Docs, a spreadsheet, an AI chat or a terminal. You can also type markdown.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="pane-inspect" role="tabpanel" aria-labelledby="tab-inspect" class="pane" hidden>
+        <div class="inspect-head">
+          <p id="inspect-summary" class="muted">Nothing read yet.</p>
+          <button id="inspect-copy" class="btn ghost small" type="button" disabled>Copy report</button>
+        </div>
+        <div class="formats" id="formats"></div>
+        <div class="format-view" id="format-view"></div>
+      </div>
+    </section>
+
+    <!-- ======================= TO ======================= -->
+    <section class="col to" aria-label="Destination">
+      <div class="col-head">
+        <h2>To</h2>
+        <div class="dests" role="radiogroup" aria-label="Destination" id="dests">
+          <button class="dest" role="radio" data-dest="slack" aria-checked="true"><span class="dot"></span>Slack<span class="note"></span></button>
+          <button class="dest" role="radio" data-dest="jira" aria-checked="false"><span class="dot"></span>Jira<span class="note"></span></button>
+          <button class="dest" role="radio" data-dest="confluence" aria-checked="false"><span class="dot"></span>Confluence<span class="note"></span></button>
+          <button class="dest" role="radio" data-dest="email" aria-checked="false"><span class="dot"></span>Email<span class="note"></span></button>
+          <button class="dest" role="radio" data-dest="gdocs" aria-checked="false"><span class="dot"></span>Docs<span class="note"></span></button>
+          <button class="dest" role="radio" data-dest="markdown" aria-checked="false"><span class="dot"></span>Markdown<span class="note"></span></button>
+          <button class="dest" role="radio" data-dest="text" aria-checked="false"><span class="dot"></span>Text<span class="note"></span></button>
+          <button class="dest" role="radio" data-dest="notion" aria-checked="false"><span class="dot"></span>Notion<span class="note"></span></button>
+          <button class="dest" role="radio" data-dest="linear" aria-checked="false"><span class="dot"></span>Linear<span class="note"></span></button>
+          <button class="dest" role="radio" data-dest="teams" aria-checked="false"><span class="dot"></span>Teams<span class="note"></span></button>
+        </div>
+      </div>
+      <p class="dest-sub" id="dest-sub"></p>
+      <div class="frame-wrap"><div id="preview" class="frame"></div></div>
+      <div id="changes" class="changes"></div>
+      <footer class="action">
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+        <button id="pdf-btn" class="btn ghost" type="button" disabled hidden title="Save what you copied as a PDF file">Save as PDF</button>
+        <button id="copy-btn" class="btn primary" type="button" disabled><span id="copy-label">Copy for Slack</span><span class="keys"><kbd class="mod">Ctrl</kbd><kbd>↵</kbd></span></button>
+      </footer>
+    </section>
+  </main>
+
+  <script src="icons.js"></script>
+  <script src="core/ast-utils.js"></script>
+  <script src="core/lift.js"></script>
+  <script src="core/lists.js"></script>
+  <script src="core/people.js"></script>
+  <script src="core/terminal.js"></script>
+  <script src="core/pdf.js"></script>
+  <script src="core/detect.js"></script>
+  <script src="core/minidom.js"></script>
+  <script src="core/normalize-html.js"></script>
+  <script src="core/normalize-markdown.js"></script>
+  <script src="core/normalize-mrkdwn.js"></script>
+  <script src="core/render-slack.js"></script>
+  <script src="core/render-slack-html.js"></script>
+  <script src="core/render-jira.js"></script>
+  <script src="core/render-github.js"></script>
+  <script src="core/render-gdocs.js"></script>
+  <script src="core/render-email.js"></script>
+  <script src="core/render-text.js"></script>
+  <script src="core/fidelity.js"></script>
+  <script src="core/engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

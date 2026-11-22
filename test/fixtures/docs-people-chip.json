@@ -1,0 +1,27 @@
+{
+  "name": "Google Docs people chip (@mention smart chip)",
+  "real": true,
+  "captured": "2026-11-08 from Google Docs",
+  "html": "<meta charset=\"utf-8\"><b style=\"font-weight:normal;\" id=\"docs-internal-guid-13a75ccb-7fff-9df3-4938-bc9984820889\"><br /><p dir=\"ltr\" style=\"line-height:1.38;margin-top:12pt;margin-bottom:12pt;\"><a href=\"mailto:priya.shah@example.com\" style=\"text-decoration:none;\"><span style=\"font-size:11pt;font-family:Arial,sans-serif;color:#1155cc;background-color:transparent;font-weight:700;font-style:normal;font-variant:normal;text-decoration:underline;-webkit-text-decoration-skip:none;text-decoration-skip-ink:none;vertical-align:baseline;white-space:pre;white-space:pre-wrap;\" data-rich-links=\"{&quot;per_n&quot;:&quot;priya shah&quot;,&quot;per_e&quot;:&quot;priya.shah@example.com&quot;,&quot;type&quot;:&quot;person&quot;}\">priya shah</span></a></p></b><br class=\"Apple-interchange-newline\">",
+  "text": "\npriya shah\n",
+  "expect": {
+    "source": "gdocs",
+    "mentions": [
+      "priya shah"
+    ],
+    "tables": 0,
+    "contains": {
+      "gdocs": [
+        "data-rich-links",
+        "mailto:priya.shah@example.com"
+      ],
+      "jira": [
+        "mailto:priya.shah@example.com"
+      ],
+      "text": [
+        "@priya shah (priya.shah@example.com)"
+      ]
+    },
+    "excludes": []
+  }
+}

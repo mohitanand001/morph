@@ -1,0 +1,51 @@
+{
+  "name": "Slack message with a mention, bold, and a table in a code block",
+  "real": true,
+  "captured": "2026-11-08 from Slack desktop",
+  "html": "<div style=\"margin: 0; padding: 0; color: #1d1c1d; margin: 4px 0; padding: 0\">Hey, <span style=\"color: inherit\"><a target=\"_blank\" href=\"https://acme.slack.com/team/U0AAAAAAA1\" rel=\"noopener noreferrer\" style=\"color: #1264a3; text-decoration: none; background-color: #e8f5fa; color: #1264a3; padding: 0 2px; border-radius: 3px; font-weight: 500\">@priya.shah</a></span>,<br><br>This is the <b style=\"font-weight: 700; font-weight: 700\">table</b><br><br></div><pre style=\"background-color: #f8f8f8; border: 1px solid #dddddd; border-radius: 4px; padding: 8px 12px; font-family: Monaco, Menlo, Consolas, &quot;Courier New&quot;, monospace; font-size: 12px; white-space: pre-wrap; margin: 8px 0\"><div style=\"margin: 0; padding: 0; color: #1d1c1d\">Service             | Status     | Owner     | Severity | ETA\n--------------------|------------|-----------|----------|----\ncheckout-api        | Resolved   | Jane Doe  | High     | —\npayments-db         | Monitoring | Raj Patel | Critical | —\nnotification-worker | Resolved   | Mia Chen  | Low      | —\nauth-service        | Unaffected | —         | —        | —\nbilling-service     | Unaffected | —         | —        | —</div></pre>",
+  "text": "Hey, @priya.shah,\n\nThis is the table\n\nService             | Status     | Owner     | Severity | ETA\n--------------------|------------|-----------|----------|----\ncheckout-api        | Resolved   | Jane Doe  | High     | —\npayments-db         | Monitoring | Raj Patel | Critical | —\nnotification-worker | Resolved   | Mia Chen  | Low      | —\nauth-service        | Unaffected | —         | —        | —\nbilling-service     | Unaffected | —         | —        | —",
+  "expect": {
+    "source": "slack",
+    "mentions": [
+      "priya.shah"
+    ],
+    "tables": 1,
+    "contains": {
+      "jira": [
+        "<th>Service</th>",
+        "<td>checkout-api</td>"
+      ],
+      "gdocs": [
+        "<table",
+        ">checkout-api<"
+      ],
+      "github": [
+        "| Service",
+        "| checkout-api"
+      ],
+      "text": [
+        "Service",
+        "checkout-api"
+      ]
+    },
+    "excludes": [],
+    "excludesIn": {
+      "jira": [
+        "slack.com/team",
+        "https://acme"
+      ],
+      "gdocs": [
+        "slack.com/team",
+        "https://acme"
+      ],
+      "github": [
+        "slack.com/team",
+        "https://acme"
+      ],
+      "text": [
+        "slack.com/team",
+        "https://acme"
+      ]
+    }
+  }
+}

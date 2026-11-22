@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Morph: try it in your browser</title>
+<meta name="description" content="Copy a sample from Slack, Jira, Google Docs or an AI chat and see what Morph pastes into each app. Runs entirely in your browser.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#f7f1e1; --paper:#fffdf6; --fg:#0a3a45; --muted:#5b6f6f; --line:#ddd3b4; --edge:#cfc29a;
+  --accent:#137b72; --accent-ink:#fff; --ok-bg:#dff3ec; --ok-line:#9fd3c3; --warn-bg:#fbefd2; --warn-line:#e3c36d;
+  --brand:#137b72;
+  --sans:'Manrope',system-ui,-apple-system,'Segoe UI',Ubuntu,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  color-scheme:light}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.55 var(--sans);margin:0;
+  padding:0 max(16px,env(safe-area-inset-right,0px)) 72px max(16px,env(safe-area-inset-left,0px))}
+.wrap{max-width:1080px;margin:0 auto}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:22px 0 8px;flex-wrap:wrap}
+.mark{display:inline-flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.01em;text-decoration:none;color:var(--fg)}
+.mark i{width:34px;height:34px;border-radius:10px;background:var(--accent);display:grid;place-items:center}
+.mark svg{width:21px;height:21px;fill:var(--accent-ink)}
+.btn{display:inline-block;font:800 14px var(--sans);text-decoration:none;color:var(--accent-ink);background:var(--accent);border:0;padding:10px 18px;border-radius:11px;cursor:pointer;
+  box-shadow:0 3px 0 rgba(0,0,0,.3);transition:transform .08s,box-shadow .08s}
+.btn:active{transform:translateY(3px);box-shadow:0 0 0 rgba(0,0,0,.3)}
+.btn.ghost{background:var(--paper);color:var(--fg);border:1px solid var(--line);box-shadow:0 2px 0 var(--edge)}
+.btn.ghost:active{transform:translateY(2px);box-shadow:none}
+.btn[disabled]{opacity:.5;cursor:default}
+h1{font-size:clamp(30px,5.2vw,46px);line-height:1.08;margin:18px 0 10px;font-weight:800;letter-spacing:-.025em;text-wrap:balance}
+.lede{font-size:18px;max-width:62ch;color:var(--muted);margin:0 0 6px}
+.priv{font-size:14px;color:var(--muted);margin:0 0 20px}
+.step-h{display:flex;align-items:center;gap:12px;margin:30px 0 12px}
+.step-h .n{width:34px;height:34px;border-radius:11px;background:var(--paper);border:1px solid var(--line);box-shadow:0 2px 0 var(--edge);display:grid;place-items:center;font-weight:800;color:var(--accent);flex:none}
+.step-h h2{margin:0;font-size:21px;letter-spacing:-.01em}
+.step-h small{color:var(--muted);font-weight:500;font-size:14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.grp{margin:22px 0 10px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.grp:first-child{margin-top:0}
+.look{margin:0 0 12px;padding:8px 12px;background:var(--ok-bg);border:1px solid var(--ok-line);border-radius:10px;font-size:14px;line-height:1.45}
+.sample{display:flex;flex-direction:column;gap:6px;text-align:left;font:inherit;color:inherit;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px 16px;cursor:pointer;box-shadow:0 2px 0 var(--edge);transition:transform .08s,box-shadow .08s,border-color .1s}
+.sample:hover{border-color:var(--accent)}
+.sample:active{transform:translateY(2px);box-shadow:none}
+.sample[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.sample .t{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px}
+.tile{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;flex:none;background:#eef0f2;color:#333}
+.tile svg{width:16px;height:16px}
+.sample p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.4}
+.own{border-style:dashed;background:transparent;box-shadow:none}
+.own textarea{width:100%;min-height:54px;resize:vertical;font:13px/1.4 var(--mono);border:1px solid var(--line);border-radius:9px;padding:8px;background:var(--paper);color:var(--fg)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:var(--fg);color:#fff;font-weight:700;font-size:14px;padding:10px 18px;border-radius:12px;opacity:0;pointer-events:none;transition:.2s;z-index:9;max-width:90vw}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.stage{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:16px;align-items:start}
+@media(max-width:820px){.stage{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 0 var(--edge);overflow:hidden}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ph b{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:2px}
+.seg button{font:700 12.5px var(--sans);border:0;background:transparent;color:var(--muted);padding:5px 11px;border-radius:8px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--paper);color:var(--fg);box-shadow:0 1px 0 var(--edge)}
+.pb{padding:16px;min-height:200px}
+.empty{color:var(--muted);text-align:center;padding:56px 12px;font-size:15px}
+.badge{display:inline-flex;align-items:center;gap:7px;font-weight:800;font-size:14px;margin:0 0 4px}
+.badge .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px rgba(19,123,114,.18)}
+.sum{color:var(--muted);font-size:14px;margin:0 0 12px}
+iframe.view{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;display:block;height:140px}
+pre.view{margin:0;padding:14px;border:1px solid var(--line);border-radius:10px;background:#fff;font:13px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;max-height:460px;overflow:auto;color:#222}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:8px;font:700 14px var(--sans);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:6px 14px 6px 8px;cursor:pointer}
+.chip:hover{border-color:var(--brand)}
+.chip[aria-pressed="true"]{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand);background:var(--paper)}
+.chip .tile{width:22px;height:22px;border-radius:7px}
+.chip .tile svg{width:14px;height:14px}
+.chip{position:relative}
+.chip .mk{position:absolute;top:-3px;right:-3px;width:11px;height:11px;border-radius:50%;border:2px solid var(--paper);box-sizing:content-box}
+.mk.c{background:var(--accent)}
+.mk.t{background:var(--paper);box-shadow:inset 0 0 0 2px var(--accent)}
+.mk.n{background:#9aa6a6}
+.key{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0 0;font-size:12.5px;color:var(--muted)}
+.key i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.verdict{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin:0 0 8px;font-size:14px}
+.verdict b{font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding:2px 9px;border-radius:999px;color:#fff;background:var(--accent)}
+.verdict.t b{background:var(--paper);color:var(--accent);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.verdict.n b{background:#9aa6a6}
+.sec{margin:16px 0 0;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.hint{margin:6px 0 12px;color:var(--muted);font-size:14px}
+.chrome{display:flex;align-items:center;gap:8px;font-weight:800;font-size:13px;margin:12px 0 8px;color:var(--brand)}
+.notes{margin:12px 0 0;padding:10px 14px 10px 30px;background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:11px;font-size:14px}
+.notes.ok{background:var(--ok-bg);border-color:var(--ok-line);padding-left:14px;list-style:none}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.row .spacer{flex:1}
+details{margin-top:12px;font-size:14px}
+summary{cursor:pointer;font-weight:700;color:var(--muted)}
+footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:14px;display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="mark" href="./"><i><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h167q11-35 43-57.5t70-22.5q40 0 71.5 22.5T594-840h166q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm80-80h400v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm200-190q13 0 21.5-8.5T510-820q0-13-8.5-21.5T480-850q-13 0-21.5 8.5T450-820q0 13 8.5 21.5T480-790Z"/></svg></i>Morph</a>
+    <a class="btn ghost" href="./#install">Install on Linux</a>
+  </div>
+  <h1>Copy once. See what pastes right.</h1>
+  <p class="lede">Pick something you might copy, choose where it is going, and see what Morph would paste. It is the real converter from the app, running right here.</p>
+  <p class="priv">Everything happens in this tab. Nothing you paste is sent anywhere.</p>
+
+  <div class="step-h"><span class="n">1</span><h2>Copy something <small>pick a sample, or paste your own</small></h2></div>
+  <div id="samples" role="group" aria-label="Samples to copy"></div>
+
+  <div class="step-h"><span class="n">2</span><h2>Pick where it is going <small>and see what you would paste</small></h2></div>
+  <div class="stage">
+    <div class="panel">
+      <div class="ph"><b>What you copied</b>
+        <span class="seg" id="srcseg" role="group" aria-label="View of what you copied"><button type="button" data-v="rich" aria-pressed="true">As copied</button><button type="button" data-v="text" aria-pressed="false">Plain text only</button></span></div>
+      <div class="pb" id="src"><div class="empty">Pick a sample above to copy it.</div></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><b>What you paste</b>
+        <span class="seg" id="modeseg" role="group" aria-label="With or without Morph"><button type="button" data-v="morph" aria-pressed="true">With Morph</button><button type="button" data-v="plain" aria-pressed="false">Without Morph</button></span></div>
+      <div class="pb" id="out"><div class="empty">The converted version shows up here.</div></div>
+    </div>
+  </div>
+
+  <footer><span>Runs on the same converter as the app. Slack, Jira, Confluence, Google Docs, Notion, Linear and other names belong to their owners and only say which app a format is for.</span><span><a href="./">Back to install</a></span></footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/*__ENGINE__*/
+</script>
+<script>
+window.FB_SAMPLES = /*__SAMPLES__*/;
+</script>
+<script>
+/*__APP__*/
+</script>
+</body>
+</html>

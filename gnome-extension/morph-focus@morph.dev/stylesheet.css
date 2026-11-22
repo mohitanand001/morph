@@ -1,0 +1,199 @@
+/* Morph pill, drawn by GNOME Shell. Laid out like the design: Solarized
+   cream with one teal accent (Light; Dark comes later). The window pill
+   (src/pill.css) draws the same thing in HTML. No shadows: they paint
+   outside the pill and leave a halo and trails. St sizes are content-box:
+   border and padding add to width/height. */
+
+/* ---------- the tucked tab: a cream card peeking in from the edge ---------- */
+.fb-handle {
+  background-color: #f3ecd7;
+  border: 1px solid #ddd3b4;
+  border-right-width: 0;
+  border-radius: 14px 0 0 14px;
+  width: 27px;
+  height: 70px;
+  transition-duration: 120ms;
+}
+.fb-handle:hover { background-color: #ece3cd; } /* colour only: the tab never changes size under the pointer */
+.fb-handle.fb-left { border-radius: 0 14px 14px 0; border-right-width: 1px; border-left-width: 0; }
+/* the dot shows only when something is copied */
+.fb-dot { width: 6px; height: 6px; border-radius: 3px; background-color: transparent; }
+.fb-dot.fb-has { background-color: #2aa198; }
+.fb-dot.fb-ok { background-color: #6c8300; }
+.fb-size-s .fb-handle { width: 23px; height: 58px; }
+.fb-size-l .fb-handle { width: 31px; height: 84px; }
+/* quick mode: the first four apps under the clipboard (St can't auto-size a fixed height, so each size has its own) */
+.fb-strip { spacing: 2px; margin-top: 3px; padding-top: 5px; border-top: 1px solid #ddd3b4; width: 20px; }
+.fb-sbtn { width: 20px; height: 20px; border-radius: 6px; }
+/* a hover label for the icons on the tab: dark ink on cream pill, so it never blends into it */
+.fb-tip { background-color: #0a3a45; color: #fdf6e3; font-size: 12px; font-weight: 500; padding: 4px 9px; border-radius: 8px; }
+.fb-sbtn:hover { background-color: rgba(42, 161, 152, 0.14); }
+.fb-sbtn:active { background-color: rgba(42, 161, 152, 0.28); }
+.fb-sbtn.fb-busy { opacity: 128; }
+.fb-sico StIcon { icon-size: 14px; }
+.fb-original .fb-row-label { color: #5c6f72; }
+.fb-soft-hint { font-size: 11px; color: #93a1a1; }
+
+/* ---------- the panel ---------- */
+/* Every border here is the same width all round: St can't round uneven borders. */
+.fb-panel {
+  background-color: #fdf6e3;
+  border: 1px solid #ddd3b4;
+  border-right-width: 0;
+  border-radius: 16px 0 0 16px;
+  width: 296px;
+  color: #0a3a45;
+  font-size: 12.5px;
+  padding: 0 0 4px 0;
+}
+.fb-panel.fb-left { border-radius: 0 16px 16px 0; border-right-width: 1px; border-left-width: 0; }
+.fb-panel.fb-view-settings { width: 460px; }
+.fb-size-s .fb-panel { width: 264px; }
+.fb-size-s .fb-panel.fb-view-settings { width: 420px; }
+.fb-size-l .fb-panel { width: 336px; }
+.fb-size-l .fb-panel.fb-view-settings { width: 520px; }
+
+/* title bar */
+.fb-bar { spacing: 8px; height: 44px; padding: 0 8px 0 12px; }
+.fb-logo { width: 24px; height: 24px; border-radius: 7px; background-color: #2aa198; }
+.fb-logo-big { width: 40px; height: 40px; border-radius: 11px; }
+.fb-title { font-size: 14px; font-weight: 700; color: #0a3a45; }
+.fb-ib { width: 28px; height: 28px; border-radius: 8px; padding: 0; }
+.fb-ib:hover { background-color: #f3ecd7; }
+.fb-wc { spacing: 2px; padding-left: 6px; border-left: 1px solid #e7ddc0; }
+.fb-x:hover { background-color: #e5484d; }
+
+/* the scrolling body: no visible scrollbar */
+.fb-scroll StScrollBar { width: 0; min-width: 0; }
+
+/* what's on the clipboard */
+.fb-source { margin: 0 12px 4px 12px; spacing: 10px; padding: 9px 10px; background-color: #f3ecd7; border: 1px solid #e7ddc0; border-radius: 12px; }
+.fb-stile { width: 32px; height: 32px; border-radius: 9px; background-color: #fdf6e3; border: 1px solid #ddd3b4; }
+.fb-src-title { font-size: 13px; font-weight: 700; color: #0a3a45; }
+.fb-sub { font-size: 11.5px; color: #93a1a1; }
+.fb-sub.fb-ok { color: #5a6e00; font-weight: 600; }
+.fb-sub.fb-warn { color: #946e00; font-weight: 600; }
+.fb-ghost { font-size: 11.5px; font-weight: 600; color: #137b72; background-color: #fdf6e3; border: 1px solid #ddd3b4; padding: 4px 9px; border-radius: 8px; }
+.fb-ghost:hover { border-color: #2aa198; background-color: rgba(42, 161, 152, 0.14); }
+.fb-msg { margin: 0 16px 4px 16px; width: 262px; }
+.fb-size-s .fb-msg { width: 230px; }
+.fb-size-l .fb-msg { width: 302px; }
+.fb-ghost-ib { border: 1px solid #ddd3b4; background-color: #fdf6e3; }
+.fb-ghost-ib:hover { border-color: #2aa198; background-color: rgba(42, 161, 152, 0.14); }
+.fb-note { margin: 0 16px 2px 16px; font-size: 11.5px; color: #93a1a1; }
+
+/* the apps */
+.fb-section { padding: 6px 16px 2px 16px; font-size: 11px; font-weight: 600; color: #93a1a1; }
+.fb-list { spacing: 1px; padding: 2px 8px 6px 8px; }
+.fb-list-top { padding: 4px 8px 0 8px; }
+.fb-row { padding: 5px 8px; border-radius: 10px; border: 1px solid transparent; color: #0a3a45; }
+.fb-row:hover { background-color: #f3ecd7; }
+.fb-row-box { spacing: 10px; }
+.fb-row-label { font-size: 13px; font-weight: 500; color: #0a3a45; }
+.fb-row-primary { background-color: rgba(42, 161, 152, 0.14); border-color: rgba(42, 161, 152, 0.28); }
+.fb-row-primary:hover { background-color: rgba(42, 161, 152, 0.24); }
+.fb-row-primary .fb-row-label { font-weight: 700; }
+.fb-row.fb-busy { color: #93a1a1; }
+.fb-row.fb-done { background-color: #e8ebcf; border-color: transparent; }
+.fb-row.fb-done .fb-row-label { color: #5a6e00; font-weight: 700; }
+.fb-badge { spacing: 4px; height: 20px; padding: 0 6px; border-radius: 6px; background-color: #2aa198; }
+.fb-badge-label { font-size: 11px; font-weight: 600; color: #ffffff; }
+.fb-dico { width: 24px; height: 24px; border-radius: 7px; background-color: #f1eadb; border: 1px solid rgba(70, 55, 20, 0.12); }
+.fb-dico StIcon { icon-size: 15px; }
+.fb-dico-ok { background-color: #6c8300; border-color: #6c8300; }
+
+.fb-foot { spacing: 14px; padding: 8px 16px 6px 16px; border-top: 1px solid #e7ddc0; }
+.fb-link { font-size: 12px; font-weight: 600; color: #137b72; }
+.fb-link:hover { color: #0a3a45; }
+
+/* switches */
+.fb-sw { width: 34px; height: 20px; border-radius: 10px; background-color: #ddd3b4; padding: 0 2px; }
+.fb-sw.fb-sw-on { background-color: #2aa198; }
+.fb-sw-knob { width: 16px; height: 16px; border-radius: 8px; background-color: #ffffff; }
+
+/* settings: sidebar + pane */
+.fb-settings { border-top: 1px solid #e7ddc0; }
+.fb-side { width: 116px; padding: 10px 8px; spacing: 2px; border-right: 1px solid #e7ddc0; }
+.fb-nav { padding: 6px 8px; border-radius: 8px; }
+.fb-nav:hover { background-color: #f3ecd7; }
+.fb-nav-on { background-color: rgba(42, 161, 152, 0.14); }
+.fb-nav-on:hover { background-color: rgba(42, 161, 152, 0.2); }
+.fb-nav-box { spacing: 8px; }
+.fb-nav-label { font-size: 12.5px; font-weight: 500; color: #5c6f72; }
+.fb-nav-on .fb-nav-label { font-weight: 700; color: #0a3a45; }
+.fb-content { padding: 12px 14px; }
+.fb-h2 { font-size: 15px; font-weight: 700; color: #0a3a45; }
+.fb-lede { font-size: 11.5px; color: #93a1a1; margin: 1px 0 6px 0; }
+.fb-subhead { font-size: 11px; font-weight: 600; color: #93a1a1; margin: 10px 0 4px 0; }
+.fb-opt { padding: 8px 0; }
+.fb-opt.fb-sep { border-top: 1px solid #e7ddc0; }
+.fb-opt-box { spacing: 10px; }
+.fb-oi { width: 28px; height: 28px; border-radius: 8px; background-color: #f3ecd7; }
+.fb-oi StIcon { icon-size: 16px; }
+.fb-ot-b { font-size: 12.5px; font-weight: 600; color: #0a3a45; }
+.fb-ot-s { font-size: 11.5px; color: #93a1a1; }
+.fb-ot-warn { font-size: 11px; font-weight: 600; color: #946e00; }
+.fb-keys { spacing: 3px; margin-top: 3px; }
+.fb-kbd { font-size: 10.5px; font-weight: 600; color: #5c6f72; background-color: #fbf6e8; border: 1px solid #d9cfb0; border-radius: 5px; padding: 1px 6px; }
+.fb-applist { spacing: 4px; }
+.fb-app-row { padding: 5px 8px; border: 1px solid #e7ddc0; border-radius: 10px; background-color: #fdf6e3; }
+.fb-app-row:hover { border-color: #ddd3b4; background-color: #f8f1dd; }
+.fb-app-box { spacing: 8px; }
+.fb-app-name { font-size: 12.5px; font-weight: 500; color: #0a3a45; }
+.fb-app-row.fb-off .fb-app-name { color: #93a1a1; }
+.fb-app-row.fb-gap { border: 1px dashed #2aa198; background-color: rgba(42, 161, 152, 0.08); }
+.fb-app-row.fb-floating { border-color: #2aa198; background-color: #fdf6e3; }
+.fb-swbtn { padding: 0; }
+.fb-cards { spacing: 8px; }
+.fb-card { border: 2px solid #ddd3b4; border-radius: 12px; padding: 8px; background-color: #fdf6e3; }
+.fb-card:hover { border-color: rgba(42, 161, 152, 0.45); }
+.fb-card-on { border-color: #2aa198; background-color: rgba(42, 161, 152, 0.12); }
+.fb-card-box { spacing: 4px; }
+.fb-wg-holder { height: 32px; }
+.fb-wg { border: 2px solid #93a1a1; border-radius: 5px; }
+.fb-wg-bar { height: 5px; background-color: #93a1a1; }
+.fb-wg-s { width: 24px; height: 16px; }
+.fb-wg-m { width: 34px; height: 22px; }
+.fb-wg-l { width: 44px; height: 28px; }
+.fb-swatch { height: 32px; border-radius: 8px; border: 1px solid #e7ddc0; }
+.fb-look-sol-light { background-color: #fdf6e3; }
+.fb-look-sol-dark { background-color: #04313d; }
+.fb-cl { font-size: 12.5px; font-weight: 700; color: #0a3a45; }
+.fb-cs { font-size: 11px; color: #93a1a1; }
+.fb-hero { spacing: 10px; margin: 4px 0 10px 0; }
+.fb-hero-name { font-size: 15px; font-weight: 700; color: #0a3a45; }
+.fb-hero-ver { font-size: 11.5px; color: #93a1a1; }
+.fb-about-text { font-size: 12px; color: #5c6f72; margin-bottom: 8px; width: 290px; }
+.fb-about-legal { font-size: 10.5px; color: #93a1a1; width: 290px; }
+.fb-size-s .fb-about-text, .fb-size-s .fb-about-legal { width: 255px; }
+.fb-size-l .fb-about-text, .fb-size-l .fb-about-legal { width: 345px; }
+
+/* Settings blocks (Updates, Uninstall): bordered cards, restrained colour, wrapped text */
+.fb-blk-p { margin: 2px 0 10px 0; }
+.fb-blk-text { font-size: 12px; color: #5c6f72; width: 266px; }
+.fb-size-s .fb-blk-text { width: 231px; }
+.fb-size-l .fb-blk-text { width: 321px; }
+.fb-blk { width: 266px; padding: 12px; border-radius: 12px; border: 1px solid #e7ddc0; background-color: #fffaf0; margin: 4px 0 10px 0; spacing: 6px; }
+.fb-size-s .fb-blk { width: 231px; }
+.fb-size-l .fb-blk { width: 321px; }
+.fb-blk-ok { background-color: #e6f4f1; border-color: #9fd3cc; }
+.fb-blk-warn { background-color: #fbf2d8; border-color: #e3cd8a; }
+.fb-blk-plain { background-color: #fffaf0; border-color: #e7ddc0; }
+.fb-blk-head { spacing: 10px; }
+.fb-blk-title { font-size: 13px; font-weight: 700; color: #0a3a45; width: 220px; }
+.fb-size-s .fb-blk-title { width: 185px; }
+.fb-size-l .fb-blk-title { width: 275px; }
+.fb-blk-ic { width: 28px; height: 28px; border-radius: 14px; }
+.fb-blk-ic-ok { background-color: #cfeae6; }
+.fb-blk-ic-warn { background-color: #f4e3ae; }
+.fb-blk-ic-plain { background-color: #f3ecd7; }
+.fb-blk-item { color: #0a3a45; }
+.fb-blk-btns { spacing: 8px; margin: 0 0 8px 0; }
+.fb-btn { padding: 6px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 600; border: 1px solid #d9cfae; }
+.fb-btn-primary { color: #ffffff; background-color: #137b72; border-color: #137b72; }
+.fb-btn-primary:hover { background-color: #0f655d; }
+.fb-btn-secondary { color: #0a3a45; background-color: #fdf6e3; }
+.fb-btn-secondary:hover { background-color: #f3ecd7; }
+.fb-btn-danger { color: #ffffff; background-color: #b5544b; border-color: #b5544b; }
+.fb-btn-danger:hover { background-color: #9c453d; }
+.fb-btn-off, .fb-btn-off:hover { color: #93a1a1; background-color: #f3ecd7; border-color: #e7ddc0; }

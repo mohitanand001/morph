@@ -1,0 +1,14 @@
+{
+  "uuid": "morph-focus@morph.dev",
+  "name": "Morph helper",
+  "description": "Draws the Morph pill and tells Morph which window is in front, so the pill appears only in the apps you choose. It shares only the focused window's app id and title, over D-Bus, on your own computer.",
+  "shell-version": [
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50"
+  ],
+  "version": 13
+}

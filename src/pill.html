@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'" />
+<title>Morph pill</title>
+<link rel="stylesheet" href="pill.css" />
+</head>
+<body>
+  <!-- Drawn from the same spec as the GNOME pill (main.js, shellSpec), so
+       both look and work the same. -->
+  <div class="pill theme-sol-light size-m side-r" id="pill-root" data-open="false">
+    <div class="handle" id="handle" role="button" tabindex="0" aria-label="Open Morph" aria-expanded="false"><span class="dot" id="dot"></span></div>
+    <div class="panel" id="panel" role="dialog" aria-label="Morph"></div>
+    <div class="tuner" id="tuner" hidden></div>
+  </div>
+  <script src="icons.js"></script>
+  <script src="tuner.js"></script>
+  <script src="pill.js"></script>
+</body>
+</html>

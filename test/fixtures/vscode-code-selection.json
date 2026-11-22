@@ -1,0 +1,26 @@
+{
+  "name": "VS Code multi-line selection (synthetic, modelled on VS Code's markup)",
+  "real": false,
+  "html": "<meta charset='utf-8'><div style=\"color:#d4d4d4;background-color:#1e1e1e;font-family:Consolas, 'Courier New', monospace;font-weight:normal;font-size:14px;line-height:19px;white-space:pre;\"><div><span>function f(a, b) {</span></div><div><span>  if (a &lt; b &amp;&amp; b &gt; 0) {</span></div><div><span>    return a;</span></div><div><span>  }</span></div><div><span>}</span></div></div>",
+  "text": "function f(a, b) {\n  if (a < b && b > 0) {\n    return a;\n  }\n}",
+  "expect": {
+    "source": "code-editor",
+    "mentions": [],
+    "tables": 0,
+    "contains": {
+      "github": [
+        "```\nfunction f(a, b) {\n  if (a < b && b > 0) {"
+      ],
+      "gdocs": [
+        "&nbsp;&nbsp;if"
+      ],
+      "jira": [
+        "a &lt; b &amp;&amp; b &gt; 0"
+      ],
+      "text": [
+        "  if (a < b && b > 0) {"
+      ]
+    },
+    "excludes": []
+  }
+}

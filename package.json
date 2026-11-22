@@ -1,0 +1,62 @@
+{
+  "name": "morph",
+  "productName": "Morph",
+  "version": "0.15.0-rc.1",
+  "description": "Copy from Slack, Jira, Confluence, Outlook, Docs, spreadsheets, AI chats or a terminal, and paste correctly anywhere.",
+  "main": "main.js",
+  "author": "Morph",
+  "license": "SEE LICENSE IN LICENSE",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/run-all.js",
+    "dist:linux": "electron-builder --linux AppImage deb",
+    "dist:mac": "electron-builder --mac dmg"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0",
+    "playwright": "^1.63.0"
+  },
+  "build": {
+    "appId": "dev.morph.app",
+    "productName": "Morph",
+    "files": [
+      "main.js",
+      "preload.js",
+      "preload-pill.js",
+      "lib/**/*",
+      "src/**/*",
+      "gnome-extension/**/*",
+      "build/icon.png",
+      "build/icon.svg",
+      "build/tray.png",
+      "build/tray@2x.png",
+      "build/trayTemplate.png",
+      "build/trayTemplate@2x.png"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "icon": "build/icon.png",
+      "maintainer": "Morph"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "extendInfo": {
+        "LSUIElement": true,
+        "NSAppleEventsUsageDescription": "Morph reads which app and window are in front, so the pill appears only in the apps you choose. If you turn on \"Paste for me\", it also presses ⌘V for you."
+      }
+    }
+  }
+}

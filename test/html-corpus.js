@@ -1,0 +1,52 @@
+// Realistic clipboard HTML, used to check that the small HTML parser (minidom.js) gives the same
+// result as a browser's own parser. Add a snippet here whenever a real copy turns up a problem.
+const fs = require('fs');
+const path = require('path');
+const fromFixtures = fs.readdirSync(path.join(__dirname, 'fixtures')).filter((f) => f.endsWith('.json'))
+  .map((f) => JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', f), 'utf8')).html).filter(Boolean);
+
+module.exports = fromFixtures.concat([
+  '<p>Plain paragraph</p>',
+  'Just text, no tags &amp; an entity &lt;b&gt; &nbsp; done',
+  '<meta charset="utf-8"><p>Leading meta</p>',
+  '<html><body><!--StartFragment--><p>Fragment <b>bold</b> and <i>italic</i> and <s>strike</s> and <code>code</code></p><!--EndFragment--></body></html>',
+  '<h1>Title</h1><h2>Sub</h2><h3>Third</h3><p>Body</p>',
+  '<ul><li>one</li><li>two<ul><li>nested a</li><li>nested b</li></ul></li><li>three</li></ul>',
+  '<ol><li>first</li><li>second</li></ol>',
+  '<ul><li>unclosed one<li>unclosed two<li>unclosed three</ul>',
+  '<p>one<p>two<p>three',
+  '<ul><li><input type="checkbox" checked> done</li><li><input type="checkbox"> todo</li></ul>',
+  '<ul><li><p><input type="checkbox"> para task</p></li></ul>',
+  '<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr></tbody></table>',
+  '<table><tr><td>no tbody 1</td><td>x</td></tr><tr><td>no tbody 2</td><td>y</td></tr></table>',
+  '<table><tr><th>H1<th>H2<tr><td>a<td>b</table>',
+  '<table><tr><td>outer<table><tr><td>inner</td></tr></table></td></tr></table>',
+  '<pre><code class="language-js">const a = 1;\nconst b = 2;</code></pre>',
+  '<pre>plain pre\n  indented</pre>',
+  '<div class="highlight-source-python"><pre>print("hi")<br>print("there")</pre></div>',
+  '<blockquote><p>quoted</p><p>more</p></blockquote>',
+  '<p>Line one<br>line two<br><br>new paragraph after double break</p>',
+  '<p>A <a href="https://example.com/?a=1&amp;b=2">link &amp; text</a> here</p>',
+  '<p><a href="https://example.com">https://example.com</a></p>',
+  '<img src="https://example.com/x.png" alt="pic"><p>after image</p>',
+  '<details><summary>Sum</summary><p>Hidden body</p><ul><li>x</li></ul></details>',
+  '<div><div><p>nested divs</p></div><div>second</div></div>',
+  '<span style="font-weight:700">bold span</span> <span style="font-style:italic">italic span</span> <span style="text-decoration:line-through">struck</span> <span style="font-family:Consolas,monospace">mono</span>',
+  '<b style="font-weight:normal" id="docs-internal-guid-1"><p dir="ltr"><span style="font-weight:700;">Docs bold</span><span> and plain</span></p></b>',
+  '<p class="MsoListParagraph" style="mso-list:l0 level1 lfo1"><span>·</span> word bullet</p><p class="MsoListParagraph" style="mso-list:l0 level2 lfo1">level two</p>',
+  '<div class="ak-renderer-document"><p>Confluence para</p><div class="code-block"><pre>x = 1</pre></div></div>',
+  '<div class="panel"><div class="panelContent"><p>A panel</p></div></div>',
+  '<P>UPPER <B>CASE</B> TAGS</P>',
+  '<p title=unquoted data-x=1 class=\'single\'>Odd attributes</p>',
+  '<p>Text with <script>alert(1)</script> script and <style>.a{}</style> style</p>',
+  '<p>entity zoo &copy; &mdash; &hellip; &#8217; &#x2713; &unknown; &amp;amp;</p>',
+  '<dl><dt>Term</dt><dd>Definition</dd><dt>Two</dt><dd>Second</dd></dl>',
+  '<p>text before list</p><ul><li>a</li></ul>text after list',
+  '<div>bare text in div<ul><li>x</li></ul>trailing</div>',
+  '<h2>Heading with <em>emphasis</em> and <strong>strong</strong></h2>',
+  '<p>   spaces   and\n newlines\t tabs </p>',
+  '<ul><li>a</li></ul><ul><li>b</li></ul>',
+  '<span data-rich-links="[]"><a href="https://x.test">chip</a></span>',
+  '<hr><p>after rule</p>',
+  '<p>unclosed <b>bold <i>both</b> italic</i> misnested</p>',
+]);

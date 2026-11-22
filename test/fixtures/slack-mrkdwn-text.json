@@ -1,0 +1,47 @@
+{
+  "name": "Slack message text (mrkdwn) with link, mention and snake_case (synthetic)",
+  "real": false,
+  "html": "",
+  "text": "*Heads up* <@U1ABC|raj>: see <https://example.com/a|the runbook> for payments_db_pool\n",
+  "expect": {
+    "source": "slack-mrkdwn",
+    "mentions": [
+      "raj"
+    ],
+    "tables": 0,
+    "contains": {
+      "github": [
+        "**Heads up**",
+        "payments_db_pool"
+      ],
+      "jira": [
+        "<strong>Heads up</strong>",
+        "the runbook"
+      ],
+      "text": [
+        "@raj",
+        "the runbook (https://example.com/a)"
+      ]
+    },
+    "excludes": [
+      "_pool_"
+    ],
+    "excludesIn": {
+      "jira": [
+        "<https://"
+      ],
+      "gdocs": [
+        "<https://"
+      ],
+      "github": [
+        "<https://"
+      ],
+      "text": [
+        "<https://"
+      ]
+    },
+    "ignoreWords": [
+      "u1abc"
+    ]
+  }
+}
