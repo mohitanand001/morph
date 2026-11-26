@@ -37,6 +37,19 @@ UPDATE_URL="${MORPH_UPDATE_URL:-https://mohitanand001.github.io/morph/version.js
 
 say() { printf '%s\n' "$*"; }
 
+# ---- Only ever touch what is Morph's
+# Other programs can use the same names (a "morph" command, a "formatter" settings folder), so nothing is
+# overwritten or deleted unless it carries Morph's mark.
+ours_settings() { grep -qs '"pillMode"' "$1"; }                       # a settings file Morph (or its earlier version) wrote
+ours_desktop() { grep -qs 'daemon/gjs-main.js\|formatter-linker\|format-bridge' "$1"; }   # an autostart entry that starts Morph
+ours_link() {                                                          # ~/.local/bin/morph pointing at a Morph folder
+  [ -L "$1" ] || return 1
+  t="$(readlink -f "$1" 2>/dev/null)" || return 1
+  [ -f "$(dirname "$(dirname "$t")")/daemon/gjs-main.js" ]
+}
+# Removes a folder's known files, then the folder itself only if nothing else is left in it.
+remove_known() { d="$1"; shift; [ -d "$d" ] || return 0; for f in "$@"; do rm -rf "${d:?}/$f"; done; rmdir "$d" 2>/dev/null || true; }
+
 running() { pgrep -f "gjs.*$MAIN" >/dev/null 2>&1; }
 
 # The GNOME helper is installed in two parts: a tiny loader (extension.js, never changes) and the real
@@ -55,9 +68,9 @@ ext_current() {
 
 # The earlier, Electron-based version (if this account ever had it): stop it so the two never run together.
 retire_old() {
-  pkill -f "node_modules/electron" 2>/dev/null || true
-  rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/format-bridge.desktop"
-  rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/formatter.desktop"
+  for f in "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/format-bridge.desktop" "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/formatter.desktop"; do
+    ours_desktop "$f" && rm -f "$f"
+  done
 }
 
 do_stop() {
@@ -107,8 +120,8 @@ do_install() {
   # A first install has no command, helper or autostart yet. Settings found then were left by an earlier
   # uninstall, so they are stale: clear them, and the welcome card shows as it should.
   STALE_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/morph"
-  if [ -f "$STALE_CFG/settings.json" ] && [ ! -d "$EXT_DEST" ] && [ ! -e "$BIN_DIR/morph" ] && [ ! -f "$AUTOSTART" ]; then
-    rm -rf "$STALE_CFG"
+  if ours_settings "$STALE_CFG/settings.json" && [ ! -d "$EXT_DEST" ] && [ ! -e "$BIN_DIR/morph" ] && [ ! -f "$AUTOSTART" ]; then
+    rm -f "$STALE_CFG/settings.json"; rmdir "$STALE_CFG" 2>/dev/null || true
     say "- cleared settings left over from an earlier uninstall"
   fi
 
@@ -116,8 +129,12 @@ do_install() {
   # The command itself, on your PATH.
   chmod +x "$SELF"
   mkdir -p "$BIN_DIR"
-  ln -sf "$SELF" "$BIN_DIR/morph"
-  say "- command installed: $BIN_DIR/morph"
+  if [ -e "$BIN_DIR/morph" ] && ! ours_link "$BIN_DIR/morph"; then
+    say "- $BIN_DIR/morph belongs to another program, so it was left alone. Run Morph as:  $SELF"
+  else
+    ln -sf "$SELF" "$BIN_DIR/morph"
+    say "- command installed: $BIN_DIR/morph"
+  fi
   case ":$PATH:" in
     *":$BIN_DIR:"*) ;;
     *)
@@ -133,16 +150,20 @@ do_install() {
   NEW_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/morph"
   if [ ! -f "$NEW_CFG/settings.json" ]; then
     for old in "${XDG_CONFIG_HOME:-$HOME/.config}/formatter/settings.json" "${XDG_CONFIG_HOME:-$HOME/.config}/Format Bridge/settings.json" "${XDG_CONFIG_HOME:-$HOME/.config}/format-bridge/settings.json"; do
-      if [ -f "$old" ]; then mkdir -p "$NEW_CFG" && cp "$old" "$NEW_CFG/settings.json" && say "- kept your settings from the earlier version"; break; fi
+      if ours_settings "$old"; then mkdir -p "$NEW_CFG" && cp "$old" "$NEW_CFG/settings.json" && say "- kept your settings from the earlier version"; break; fi
     done
   fi
 
   if [ "$IS_PKG" = 0 ]; then
   # Start at login (a few seconds late, so GNOME has loaded its helper first).
   mkdir -p "$(dirname "$AUTOSTART")"
+  if [ -f "$AUTOSTART" ] && ! ours_desktop "$AUTOSTART"; then
+    say "- $AUTOSTART belongs to another program; Morph will not start at login until it is moved"
+  else
   printf '%s\n' '[Desktop Entry]' 'Type=Application' 'Name=Morph' 'Comment=Paste formatted content correctly anywhere' \
     "Exec=gjs -m \"$MAIN\"" 'X-GNOME-Autostart-enabled=true' 'X-GNOME-Autostart-Delay=4' 'Terminal=false' > "$AUTOSTART"
   say "- starts at login"
+  fi
   fi
 
   # The GNOME helper (draws the pill, reads the clipboard, grabs the shortcuts).
@@ -217,8 +238,11 @@ do_uninstall() {
   do_stop
   CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
   CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"
-  rm -f "$AUTOSTART" "$BIN_DIR/morph" "$BIN_DIR/formatter-linker" "$CFG/autostart/formatter.desktop" "$CFG/autostart/format-bridge.desktop"
-  # The GNOME helpers (this one and the old Formatter one): switch off, forget, delete.
+  # Start at login and the command: only Morph's own.
+  for f in "$AUTOSTART" "$CFG/autostart/formatter.desktop" "$CFG/autostart/format-bridge.desktop"; do ours_desktop "$f" && rm -f "$f"; done
+  ours_link "$BIN_DIR/morph" && rm -f "$BIN_DIR/morph"
+  ours_link "$BIN_DIR/formatter-linker" && rm -f "$BIN_DIR/formatter-linker"
+  # The GNOME helpers (this one and the old Formatter one): switch off, forget, delete. Both names are Morph's own.
   for uuid in "$EXT_UUID" "format-bridge-focus@formatbridge.dev"; do
     dir="$HOME/.local/share/gnome-shell/extensions/$uuid"
     [ -d "$dir" ] && gnome-extensions disable "$uuid" 2>/dev/null || true
@@ -230,12 +254,19 @@ do_uninstall() {
       done
     fi
   done
-  sed -i '/morph PATH/,+1d' "$HOME/.bashrc" 2>/dev/null || true
-  sed -i '/formatter-linker PATH/,+1d' "$HOME/.bashrc" 2>/dev/null || true
-  rm -rf "$CFG/morph" "$CFG/formatter" "$CFG/format-bridge" "$CFG/Format Bridge"
-  rm -f "$CACHE/morph.log" "$CACHE/morph-ocr.log" "$CACHE/formatter.log" "$CACHE/formatter-linker.log"
-  rm -rf "$CACHE/formatter-icons" "$OCR_DIR"
-  [ -n "${XDG_RUNTIME_DIR:-}" ] && rm -rf "$XDG_RUNTIME_DIR/morph"
+  # The two lines --install may have added to ~/.bashrc, exactly those, nothing else.
+  if [ -f "$HOME/.bashrc" ]; then
+    sed -i '/^# morph PATH$/{N;/\nexport PATH="\$HOME\/\.local\/bin:\$PATH"$/d}' "$HOME/.bashrc" 2>/dev/null || true
+    sed -i '/^# formatter-linker PATH$/{N;/\nexport PATH=.*$/d}' "$HOME/.bashrc" 2>/dev/null || true
+  fi
+  # Settings: Morph's file only. A folder another program also uses keeps that program's files.
+  for d in "$CFG/morph" "$CFG/formatter" "$CFG/format-bridge" "$CFG/Format Bridge"; do
+    ours_settings "$d/settings.json" && remove_known "$d" settings.json settings.json.bak
+  done
+  rm -f "$CACHE/morph.log" "$CACHE/morph-ocr.log" "$CACHE/formatter-linker.log"
+  # Image tables: Morph's own folder (its name is Morph's), and the private folder for copied images.
+  case "$OCR_DIR" in */morph-ocr) rm -rf "$OCR_DIR" ;; esac
+  [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -d "$XDG_RUNTIME_DIR/morph" ] && { rm -f "$XDG_RUNTIME_DIR"/morph/clip-image*; rmdir "$XDG_RUNTIME_DIR/morph" 2>/dev/null || true; }
   if [ "$IS_PKG" = 1 ]; then
     say "Removed Morph's helper, settings, logs and caches for this account."
     if command -v pkexec >/dev/null 2>&1 && pkexec dpkg --purge morph >/dev/null 2>&1; then
@@ -245,8 +276,10 @@ do_uninstall() {
     fi
   elif [ "$SAFE_DIR" = 1 ]; then
     cd "$HOME" 2>/dev/null || cd /
-    rm -rf "$APP_DIR"
-    say "Morph is gone: the program, its settings, logs and caches."
+    # Only what Morph's download contains. Anything else you put in this folder stays, and so does the folder.
+    remove_known "$APP_DIR" bin daemon lib src gnome-extension ocr LICENSE README.txt package.json
+    if [ -d "$APP_DIR" ]; then say "Morph is gone. $APP_DIR still holds files that are not Morph's, so it was left in place."
+    else say "Morph is gone: the program, its settings, logs and caches."; fi
   else
     say "Removed Morph's settings, helper and caches. Left $APP_DIR alone (it doesn't look like a Morph folder). Delete it yourself if you want."
   fi
@@ -266,10 +299,14 @@ do_update() {
   meta="$(curl -fsSL --max-time 15 "$UPDATE_URL")" || { say "Couldn't reach the update page ($UPDATE_URL)."; exit 1; }
   new="$(json_field "$meta" version)"; zip="$(json_field "$meta" zip)"; sha="$(json_field "$meta" sha256)"
   [ -n "$new" ] && [ -n "$zip" ] && [ -n "$sha" ] || { say "The update page didn't look right."; exit 1; }
+  # Only a Morph zip, from the same website, with a real fingerprint: never a link to somewhere else.
+  printf '%s' "$zip" | grep -Eq '^morph-[0-9A-Za-z.+-]+-linux\.zip$' || { say "The update page pointed somewhere unexpected, so nothing was installed."; exit 1; }
+  printf '%s' "$sha" | grep -Eq '^[0-9a-f]{64}$' || { say "The update page didn't look right."; exit 1; }
+  printf '%s' "$new" | grep -Eq '^[0-9A-Za-z.+-]{1,40}$' || { say "The update page didn't look right."; exit 1; }
   if [ "$new" = "$cur" ]; then say "Already up to date ($cur)."; exit 0; fi
   say "Updating $cur -> $new"
-  case "$zip" in http*) url="$zip" ;; *) url="${UPDATE_URL%/*}/$zip" ;; esac
-  tmp="$(mktemp -d)"
+  url="${UPDATE_URL%/*}/$zip"
+  tmp="$(mktemp -d)" || { say "Couldn't make a temporary folder."; exit 1; }
   trap 'rm -rf "$tmp"' EXIT
   curl -fsSL --max-time 120 -o "$tmp/new.zip" "$url" || { say "Download failed."; exit 1; }
   echo "$sha  $tmp/new.zip" | sha256sum -c --quiet - || { say "The download didn't match its fingerprint, so it was not installed."; exit 1; }
@@ -291,13 +328,14 @@ do_enable_ocr() {
   command -v python3 >/dev/null 2>&1 || { say "Needs python3. On Ubuntu:  sudo apt install python3 python3-venv"; exit 1; }
   python3 -c 'import venv, ensurepip' 2>/dev/null || { say "Needs python3-venv. On Ubuntu:  sudo apt install python3-venv"; exit 1; }
   # An older table OCR (PaddleOCR, about 3 GB) is replaced by the much smaller RapidOCR.
-  if [ -d "$OCR_DIR" ] && [ "$(cat "$OCR_DIR/engine" 2>/dev/null)" != rapidocr ]; then
-    case "$OCR_DIR" in */morph-ocr) rm -rf "$OCR_DIR"; say "Removed the older, larger table OCR." ;; esac
+  # (Only a finished older install: a RapidOCR install that stopped half way is kept, so Try again resumes it.)
+  if [ -f "$OCR_DIR/ready" ] && [ "$(cat "$OCR_DIR/engine" 2>/dev/null)" != rapidocr ]; then
+    case "$OCR_DIR" in */morph-ocr) rm -rf "$OCR_DIR"; say "Removed the older, larger image-tables version." ;; esac
   fi
-  say "Table OCR installs RapidOCR into $OCR_DIR (about 400 MB, one time, needs internet)."
+  say "Image tables installs RapidOCR into $OCR_DIR (about 400 MB, one time, needs internet)."
   say "Nothing is sent anywhere when you use it. Remove it any time with:  morph --disable-ocr"
   mkdir -p "$OCR_DIR"
-  # "Step n of 4" lines drive the progress bar in Settings → Images.
+  # "Step n of 4" lines drive the progress bar in Settings → Image tables.
   say "Step 1 of 4: Preparing a private Python environment..."
   [ -x "$OCR_DIR/venv/bin/python" ] || python3 -m venv "$OCR_DIR/venv" || { say "Could not create the Python environment."; rm -rf "$OCR_DIR"; exit 1; }
   say "Step 2 of 4: Updating the Python installer..."
@@ -321,11 +359,11 @@ do_enable_ocr() {
   fi
   printf 'rapidocr' > "$OCR_DIR/engine"
   : > "$OCR_DIR/ready"
-  say "Table OCR is on. Copy a screenshot of a table, then pick an app in Morph."
+  say "Image tables are on. Copy a screenshot of a table, then pick an app in Morph."
   exit 0
 }
 do_disable_ocr() {
-  case "$OCR_DIR" in */morph-ocr) rm -rf "$OCR_DIR"; rm -f "${XDG_CACHE_HOME:-$HOME/.cache}/morph-ocr.log"; say "Table OCR removed." ;; *) say "Refusing to remove $OCR_DIR"; exit 1 ;; esac
+  case "$OCR_DIR" in */morph-ocr) rm -rf "$OCR_DIR"; rm -f "${XDG_CACHE_HOME:-$HOME/.cache}/morph-ocr.log"; say "Image tables removed." ;; *) say "Refusing to remove $OCR_DIR"; exit 1 ;; esac
   exit 0
 }
 

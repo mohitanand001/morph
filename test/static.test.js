@@ -228,5 +228,19 @@ check('the top-bar tray icon is optional (off by default on Linux) with a toggle
   check('site and README use the app\'s wording (Image tables, no "says so", no ✕ that hides)', !/Tables from images|table OCR|Enable table OCR|Settings → Images\b|and says so|hid Morph with the ✕|pastes fixed|never takes focus|1 GB/.test(site + readme) && /Image tables/.test(site) && /Image tables/.test(readme));
 }
 check('PDF names have no spaces: Morph_<date>_<time>.pdf, then _2', /'Morph_' \+ GLib\.DateTime\.new_now_local\(\)\.format\('%Y-%m-%d_%H\.%M\.%S'\)/.test(read('daemon/gjs-main.js')) && /base \+ '_' \+ i \+ '\.pdf'/.test(read('daemon/gjs-main.js')));
+// The GNOME helper can read any app's clipboard, see window titles and press keys: only Morph's program may ask.
+{
+  const ext = read('gnome-extension/morph-focus@morph.dev/extension.js');
+  check('the helper exports a guarded object, never itself', /wrapJSObject\(IFACE, this\._guarded\(\)\)/.test(ext) && !/wrapJSObject\(IFACE, this\)/.test(ext));
+  check('every method of the helper checks the caller first', /_guarded\(\) \{[\s\S]*?if \(!this\._allowed\(invocation\)\)[\s\S]*?AccessDenied/.test(ext) && ['Get', 'SetPill', 'ReadClipboard', 'ReadImage', 'Paste', 'SetShortcuts', 'WriteClipboard'].every((m) => new RegExp(m + ': ').test(ext.match(/const METHOD_OUT = \{[^}]*\}/)[0])));
+  check('a caller must own dev.morph.Daemon, run gjs on daemon/gjs-main.js and share the desktop\'s mount namespace', /ownerOf\(conn, DAEMON_NAME\) === sender && isMorphDaemon/.test(ext) && /ns\/mnt/.test(ext) && /gjs\(-console\)\?\$/.test(ext) && /daemon\\\/gjs-main\\\.js\$/.test(ext));
+  check('the helper\'s signals go only to Morph, never to the whole bus', !/_dbus\.emit_signal/.test(ext) && /emit_signal\(this\._peer, OBJ_PATH/.test(ext));
+  const core = read('daemon/core.js');
+  check('links open only on the web or in mail, never a file or an app\'s own scheme', /\/\^\(https:\\\/\\\/\|http:\\\/\\\/\|mailto:\)\/i\.test\(u\)/.test(core));
+  const ocr = read('ocr/morph_ocr.py');
+  check('reading a table blocks the network inside the OCR worker', /if reading:\n\s+no_network\(\)/.test(ocr) && /socket\.create_connection = refuse/.test(ocr));
+  check('a failed table read logs only the kind of error, never its message', /type\(e\)\.__name__ if reading/.test(ocr));
+  check('a crashed read leaves no copied image behind after the next start', /clearLeftImages/.test(read('daemon/gjs-main.js')));
+}
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed (static)');
 process.exit(failed ? 1 : 0);

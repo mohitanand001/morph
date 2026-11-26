@@ -351,6 +351,18 @@ bus.signal_subscribe(DEST, IFACE, null, OBJ, null, Gio.DBusSignalFlags.NONE, saf
   else if (name === 'Changed') { let j = null; try { j = JSON.parse(dec(arg)); } catch (e) { j = null; } const info = windowInfo(j); if (info) onWindow(info); }
 }));
 
+// A copied image handed over for image tables is deleted right after reading. If Morph was stopped in the middle
+// of a read, the next start removes what was left (only Morph's own clip-image files, in its private folder).
+(function clearLeftImages() {
+  try {
+    const dir = Gio.File.new_for_path(GLib.build_filenamev([GLib.get_user_runtime_dir(), 'morph']));
+    const en = dir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS, null);
+    let info;
+    while ((info = en.next_file(null)) !== null) {
+      if (/^clip-image[-0-9]*\.(png|jpg|bmp)$/.test(info.get_name())) { try { dir.get_child(info.get_name()).delete(null); } catch (e) { /* gone */ } }
+    }
+  } catch (e) { /* no folder yet */ }
+})();
 const loop = new GLib.MainLoop(null, false);
 let ownedName = false;
 let duplicate = false;

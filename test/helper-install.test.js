@@ -20,7 +20,7 @@ const gx = () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '');
 // Settings left behind by an old uninstall must not hide the setup page on a first install.
 const cfgDir = path.join(home, '.config', 'morph');
 fs.mkdirSync(cfgDir, { recursive: true });
-fs.writeFileSync(path.join(cfgDir, 'settings.json'), '{"setupDone": true}');
+fs.writeFileSync(path.join(cfgDir, 'settings.json'), '{"setupDone": true, "pillMode": "always"}');
 let r = run('--install');
 const out1 = r.stdout + r.stderr;
 check('first install clears stale settings and says so', !fs.existsSync(path.join(cfgDir, 'settings.json')) && /cleared settings left over/.test(out1), out1);
@@ -30,7 +30,7 @@ const impl1 = fs.readFileSync(path.join(ext, 'impl.txt'), 'utf8');
 check('a new helper folder appears complete in one step (no half-written folder for GNOME to load)', fs.existsSync(path.join(ext, 'metadata.json')) && fs.existsSync(path.join(ext, 'impl.txt')) && !fs.readdirSync(path.join(home, '.local/share/gnome-shell')).some((n) => /^\.morph-stage/.test(n)));
 
 fs.mkdirSync(cfgDir, { recursive: true });
-fs.writeFileSync(path.join(cfgDir, 'settings.json'), '{"setupDone": true}');
+fs.writeFileSync(path.join(cfgDir, 'settings.json'), '{"setupDone": true, "pillMode": "always"}');
 r = run('--install');
 check('a re-install or update keeps your settings', fs.existsSync(path.join(cfgDir, 'settings.json')) && !/cleared settings/.test(r.stdout));
 check('same helper again: nothing to do, nothing toggled', /already up to date/.test(r.stdout) && !/disable/.test(gx()));

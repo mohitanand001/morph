@@ -193,6 +193,20 @@ def _grid_salary_sheet():
                  ["Michael Johnson", "4.800", "1.200", "400", "5.600"]]
 
 
+def _network_blocked():
+    import socket
+    saved = (socket.socket.connect, socket.socket.connect_ex, socket.create_connection, socket.getaddrinfo)
+    try:
+        no_network()
+        try:
+            socket.create_connection(("pypi.org", 443), timeout=1)
+            return False
+        except OSError as e:
+            return "never use the network" in str(e)
+    finally:
+        socket.socket.connect, socket.socket.connect_ex, socket.create_connection, socket.getaddrinfo = saved
+
+
 def selftest():
     class R:  # what RapidOCR 2.x/3.x returns
         boxes = [[[0, 0], [10, 0], [10, 5], [0, 5]]]
@@ -205,6 +219,7 @@ def selftest():
         words_of("old", (None, 0.1)) == ([], []),
         grid_from_words(["only", "words"], [[0, 0, 10, 5], [0, 20, 10, 25]]) is None,
         "<script>" not in grid_html([["<script>", "b"], ["1", "2"]]),
+        _network_blocked(),
         strip_sheet_labels([["", "A", "B"], ["1", "Item", "Qty"], ["2", "Pens", "10"]]) == [["Item", "Qty"], ["Pens", "10"]],
         strip_sheet_labels([["#", "Name"], ["1", "Asha"], ["2", "Ravi"]]) == [["#", "Name"], ["1", "Asha"], ["2", "Ravi"]],
     ]
@@ -212,9 +227,25 @@ def selftest():
     return 0 if all(checks) else 1
 
 
+def no_network():
+    """Reading a table never uses the network: the models came with the install. Any attempt fails here."""
+    import socket
+
+    def refuse(*_a, **_k):
+        raise OSError("Morph: image tables never use the network")
+
+    socket.socket.connect = refuse
+    socket.socket.connect_ex = refuse
+    socket.create_connection = refuse
+    socket.getaddrinfo = refuse
+
+
 def main(argv):
     if len(argv) == 2 and argv[1] == "--selftest":
         return selftest()
+    reading = len(argv) == 2 and argv[1] != "--warmup"
+    if reading:
+        no_network()
     real_out = sys.stdout
     sys.stdout = sys.stderr  # libraries may print; only our one JSON line may reach stdout
     try:
@@ -226,7 +257,8 @@ def main(argv):
         else:
             out = {"ok": False, "error": "usage"}
     except Exception as e:  # noqa: BLE001 - report, never crash Morph
-        out = {"ok": False, "error": "failed", "detail": str(e)[:200]}
+        # While reading a table, only the kind of error is reported: its message could quote the picture's text.
+        out = {"ok": False, "error": "failed", "detail": type(e).__name__ if reading else str(e)[:200]}
     real_out.write(json.dumps(out) + "\n")
     return 0
 

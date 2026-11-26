@@ -144,8 +144,8 @@ function desk(opts) {
       const gj = fs2.readFileSync(path2.join(__dirname, '..', 'daemon', 'gjs-main.js'), 'utf8');
       check('OCR is installed into its own Python environment, never the system or user one', /python3 -m venv "\$OCR_DIR\/venv"/.test(sh) && !/--system-site-packages/.test(sh) && !/pip install --user/.test(sh) && /--no-cache-dir/.test(sh));
       check('OCR runs (warm-up and reads) keep any caches inside the OCR folder', /HOME="\$OCR_DIR\/home" PYTHONNOUSERSITE=1/.test(sh) && /ocr_run "\$OCR_DIR\/venv\/bin\/python"/.test(sh) && /setenv\('HOME', ocrHome/.test(gj) && /setenv\('PYTHONNOUSERSITE'/.test(gj));
-      check('the installer uses RapidOCR (small), replaces an older PaddleOCR install, and marks the engine', /rapidocr>=2,<4/.test(sh) && /rapidocr_onnxruntime/.test(sh) && !/paddlepaddle/.test(sh) && /Removed the older, larger table OCR/.test(sh) && /printf 'rapidocr' > "\$OCR_DIR\/engine"/.test(sh));
-      check('uninstall and Remove delete only Morph\'s OCR folder and log', /rm -rf "\$CACHE\/formatter-icons" "\$OCR_DIR"/.test(sh) && /morph-ocr\.log/.test(sh) && /\*\/morph-ocr\) rm -rf "\$OCR_DIR"/.test(sh) && !/paddlex/.test(sh.replace(/~\/\.paddlex/g, '')));
+      check('the installer uses RapidOCR (small), replaces an older PaddleOCR install, and marks the engine', /rapidocr>=2,<4/.test(sh) && /rapidocr_onnxruntime/.test(sh) && !/paddlepaddle/.test(sh) && /Removed the older, larger image-tables version/.test(sh) && /-f "\$OCR_DIR\/ready" \]/.test(sh) && /printf 'rapidocr' > "\$OCR_DIR\/engine"/.test(sh));
+      check('uninstall and Remove delete only Morph\'s OCR folder and log', /case "\$OCR_DIR" in \*\/morph-ocr\) rm -rf "\$OCR_DIR" ;; esac/.test(sh) && /morph-ocr\.log/.test(sh) && /\*\/morph-ocr\) rm -rf "\$OCR_DIR"/.test(sh) && !/paddlex/.test(sh.replace(/~\/\.paddlex/g, '')));
     }
     check('the installer prints the four steps', (require('fs').readFileSync(require('path').join(__dirname, '..', 'bin', 'morph'), 'utf8').match(/say "Step \d of 4:/g) || []).length === 4);
     state.installing.onLine('Step 4 of 4: Getting the text models ready (one time)...');

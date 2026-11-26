@@ -28,15 +28,18 @@ You can read the installer first: [`site/install.sh`](site/install.sh).
 - **Terminal output** and **PDF text** are cleaned up too.
 - **Converts as you arrive**: switch to one of Morph's apps and your copy is already converted, so plain Ctrl+V pastes it right. On by default; turn it off in Settings → General.
 - **A slim tab** on the screen edge opens Morph, which shows what you copied and offers the apps to convert it for. The app you're in is at the top; click an app, then paste with Ctrl+V. The ✕ closes it back into the tab.
-- **Image tables (optional)**: reads a table from a copied screenshot, on your computer, only when you click. Turn it on in Settings → Image tables (about 400 MB, using RapidOCR).
+- **Image tables (optional)**: reads a table from a copied screenshot, on your computer, only when you click. Turn it on in Settings → Image tables (about 400 MB, one time: RapidOCR from PyPI and its models from ModelScope, the RapidOCR project's model host; after that it works offline).
 
 ## Privacy
 
 - Morph never stores what you copy and never sends it anywhere. Conversion happens on your computer.
 - Morph works in all apps by default, except password managers. In Settings → Apps you can limit it to only the apps you pick. Copies that an app marks as secret are always ignored.
-- Settings → Privacy shows a log of what Morph read: time, app and size, never the content.
-- The only network use is an optional daily update check and the optional image-tables download.
-- `morph --uninstall` removes the program, the GNOME helper, settings, logs, caches and the optional image-tables files.
+- A single word with no spaces that is not a link (a password, a one-time code, a key) is let go of at once: nothing is kept or converted, even when the app gave no hint that it was secret.
+- Settings → Privacy shows a log of what Morph read: time, app and size, never the content. The log lives in memory and is gone when Morph stops.
+- Only Morph's own program can talk to its GNOME helper (the part that can read the clipboard and press Ctrl V). Any other program, including apps in a Flatpak or Snap sandbox, is refused.
+- The only network use is an optional daily update check (it asks the website for `version.json`, nothing else is sent) and the optional image-tables download. Reading a table from an image never uses the network.
+- The website and the in-browser demo load nothing from other sites: no fonts, no analytics.
+- `morph --uninstall` removes the program, the GNOME helper, settings, logs, caches and the optional image-tables files, and only those: files of other programs with similar names, and anything else you put in Morph's folder, stay where they are.
 
 Because the code is readable, you can check these claims yourself. The privacy gate lives in `daemon/core.js` (`mayRead`).
 

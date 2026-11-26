@@ -299,7 +299,12 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
     const d = desk({ saved: JSON.stringify({ atlassianSite: 'https://myco.atlassian.net' }) });
     const c = createCore(d.io);
     await c.start();
+    check('a Jira site saved by an older version is dropped from disk', !/atlassian/.test(d.saved || ''));
     c.focus({ app: 'slack', title: 'x - Slack' }, 13);
+    d.io.shell.readClip = async () => ({ formats: ['text/plain', 'text/html'], secret: false,
+      text: 'See the ticket', html: '<a href="https://myco.atlassian.net/browse/PROJ-1">See the ticket</a>' });
+    await c.clipboardChanged(); await settle();
+    check('the Jira site learned from a copy is never written to disk', !/atlassian/.test(d.saved || ''));
     d.io.shell.readClip = async () => ({
       formats: ['text/plain'], secret: false,
       text: 'Fix PROJ-42 now', html: ''
@@ -349,6 +354,25 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
     c.action('pdf:'); await settle();
     const saved = d.last();
     check('saving a PDF swaps the footer slot only (Open / Show in folder), nothing is added', flat(saved).length === flat(copied).length && saved.footer.length === 2 && saved.footer[0].action === 'openpdf:' && !!saved.primary, JSON.stringify(saved.footer));
+  }
+  // --- one word that may be a password: let go of at once, nothing kept, nothing converted
+  {
+    const d = desk({ saved: JSON.stringify({ setupDone: true }) });
+    const c = createCore(d.io);
+    await c.start();
+    c.focus({ app: 'firefox', title: 'Sign in' }, 30);
+    d.copy({ text: 'Tr0ub4dor&3xK!', html: '' });
+    await c.clipboardChanged();
+    c.focus({ app: 'slack', title: 'x - Slack' }, 30);
+    await settle();
+    check('a copied password-like word is not kept or converted (even with Convert automatically on)', d.writes.length === 0 && c.state.original === null && !/Tr0ub4dor/.test(JSON.stringify(d.pills)) && !/Tr0ub4dor/.test(d.saved || ''));
+    c.focus({ app: 'firefox', title: 'Docs' }, 30);
+    d.copy({ text: 'Docs', html: '<a href="https://example.com/docs">Docs</a>' });
+    await c.clipboardChanged();
+    check('a single word that is a link is still converted', c.state.original !== null);
+    d.copy({ text: 'https://example.com/a', html: '' });
+    await c.clipboardChanged();
+    check('a bare web address is still read', c.state.original !== null);
   }
   console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed (daemon)');
   process.exit(failed ? 1 : 0);

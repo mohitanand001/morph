@@ -35,7 +35,7 @@ const TICK_MS = 1500;
 const PILL_PAGES = ['settings', 'size', 'keys', 'privacy', 'ocr', 'edit', 'updates', 'uninstall', 'about'];
 const TERMINAL_RE = /terminal|konsole|kitty|alacritty|wezterm|tilix|xterm|ghostty/i;
 // Apps that hold passwords: with "read from all apps", copies made in them are never read.
-const PASSWORD_APPS = /1password|bitwarden|keepass|proton[ ._-]?pass|lastpass|dashlane|enpass|nordpass|keeper|roboform|authenticator|seahorse|gnome-keyring|passwords/i;
+const PASSWORD_APPS = /1password|bitwarden|vaultwarden|keepass|proton[ ._-]?pass|lastpass|dashlane|enpass|nordpass|keeper|roboform|authenticator|authy|seahorse|gnome-keyring|passwords|org\.gnome\.world\.secrets|\bsecrets\b|passbolt|buttercup|padloc|qtpass|gopass|keyguard/i;
 const SECRET_FORMATS = /x-kde-passwordmanagerhint|concealedtype|org\.nspasteboard\.(concealed|transient)|clipboard-history-exclude/i;
 
 function cleanDests(list) {
@@ -69,7 +69,7 @@ const norm = (t) => String(t == null ? '' : t).replace(/\r\n/g, '\n').replace(/\
 function createCore(io) {
   const FB = globalThis.FB;
   const log = io.log || (() => {});
-  const SETTINGS_DEFAULT = { rules: DEFAULT_RULES, pillEnabled: true, pillMode: 'always', pillYFrac: 0.42, pillSide: 'r', pillMonitor: -1, autoFormat: true, linkBack: false, crossLinks: true, tabIcons: false, theme: 'sol-light', size: 'm', shortcuts: null, pillDests: null, atlassianSite: '', seenDefaults: null, people: {}, updateCheck: true, readFrom: 'any', setupDone: false, appOrder: null, lastCheck: 0, lastOk: 0, notifiedVersion: '' };
+  const SETTINGS_DEFAULT = { rules: DEFAULT_RULES, pillEnabled: true, pillMode: 'always', pillYFrac: 0.42, pillSide: 'r', pillMonitor: -1, autoFormat: true, linkBack: false, crossLinks: true, tabIcons: false, theme: 'sol-light', size: 'm', shortcuts: null, pillDests: null, seenDefaults: null, people: {}, updateCheck: true, readFrom: 'any', setupDone: false, appOrder: null, lastCheck: 0, lastOk: 0, notifiedVersion: '' };
   let settings = Object.assign({}, SETTINGS_DEFAULT);
 
   let currentRule = null;
@@ -112,6 +112,7 @@ function createCore(io) {
   let confirmTimer = null;
   let readLog = [];           // what Morph read or skipped: time, kind, app, size. Never titles or content. Memory only.
   let lastCopy = null;        // { from, what, image } of the latest copy Morph read
+  let atlassianSite = '';     // your Jira site, seen in a copy: memory only
   let lastSkip = null;        // { app } of the latest copy Morph did not read
 
   // ---------------------------------------------------------------- settings
@@ -141,10 +142,12 @@ function createCore(io) {
     if (!['s', 'm', 'l'].includes(settings.size)) settings.size = 'm';
     settings.shortcuts = normalizeShortcuts(settings.shortcuts);
     settings.pillDests = cleanDests(settings.pillDests);
-    if (!/^https:\/\/[a-z0-9-]+\.atlassian\.net$/.test(settings.atlassianSite || '')) settings.atlassianSite = '';
+    const scrub = settings.atlassianSite !== undefined;
+    delete settings.atlassianSite; // older versions saved it; it is learned from copies, so it is no longer kept on disk
     if (typeof settings.pillYFrac !== 'number' || !(settings.pillYFrac >= 0.05 && settings.pillYFrac <= 0.95)) settings.pillYFrac = 0.42;
     // The ✕ on the pill lasts until the next start, so it can never be lost for good.
     settings.pillEnabled = true;
+    if (scrub) save(); // take it off the disk now
   }
   function save() { try { io.store.write(JSON.stringify(settings, null, 2)); } catch (e) { /* read-only disk: keep in memory */ } }
 
@@ -219,7 +222,7 @@ function createCore(io) {
       return [{ kind: 'panel', tone: 'ok', icon: 'check_circle', title: 'Image tables are on', text: 'A copied image is read only when you pick an app, on this computer. Nothing is uploaded.' },
         ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Remove image tables', action: 'ocr:askoff', kind: 'secondary' }] }] : [])];
     }
-    if (ocrAsk === 'on' && ocrCanManage()) return ask('Download ' + OCR_SIZE + '?', 'This installs RapidOCR once and needs internet. Images are read only on this computer, and only when you pick an app.' + (ocrLegacy() ? ' The older, larger version (about 3 GB) is removed first.' : ''), 'Install', 'ocr:on', 'Not now');
+    if (ocrAsk === 'on' && ocrCanManage()) return ask('Download ' + OCR_SIZE + '?', 'This downloads RapidOCR once, from PyPI and its models from ModelScope (the RapidOCR project\'s model host). Images are read only on this computer, offline, and only when you pick an app.' + (ocrLegacy() ? ' The older, larger version (about 3 GB) is removed first.' : ''), 'Install', 'ocr:on', 'Not now');
     if (ocrLegacy()) {
       return [{ kind: 'panel', tone: 'warn', icon: 'download', title: 'Image tables got much smaller', text: 'The new version is ' + OCR_SIZE + ' instead of 3 GB, and reads a screenshot in a few seconds. Update to keep reading tables from images.' },
         ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Update image tables', action: 'ocr:ask', kind: 'primary' }] }] : [])];
@@ -280,7 +283,7 @@ function createCore(io) {
   }
   function copyPlace() {
     if (!copyWin || !copyWin.win) return null;
-    const ctx = describeSource(copyWin.win, copyWin.rule, '', { atlassian: settings.atlassianSite });
+    const ctx = describeSource(copyWin.win, copyWin.rule, '', { atlassian: atlassianSite });
     if (!ctx || !ctx.tool || !ctx.label) return null;
     return { tool: ctx.tool, where: ctx.label.replace(/\s+\([^)]*\)$/, ''), dest: copyWin.rule && ALL_DESTS.includes(copyWin.rule.dest) ? copyWin.rule.dest : '' };
   }
@@ -541,10 +544,24 @@ function createCore(io) {
     if (sh.secret || (sh.formats || []).some((f) => SECRET_FORMATS.test(f))) return { secret: true };
     return sh;
   }
+  // One word with no spaces that is not a link (a password, a one-time code, a key, a token) has nothing to
+  // convert, and may be secret even when the app gave no hint (a browser's password extension, say): Morph lets
+  // go of it at once and keeps nothing.
+  const looksSecret = (sh) => {
+    const t = String(sh.text || '').trim();
+    return !!t && t.length <= 512 && !/\s/.test(t) && !/^(https?:\/\/|www\.|mailto:)/i.test(t) && !/<(a|b|strong|i|em|code|img)\b/i.test(String(sh.html || '')); // a formatted word or a link is kept
+  };
   // Learn what's on the clipboard now (a new copy): its summary for the pill, and the original to convert from.
   async function refreshClip() {
     const sh = await readNow();
     if (!sh || sh.secret) return null;
+    if (looksSecret(sh)) {
+      note('read', currentRule ? currentRule.name : (winNow && winNow.app ? String(winNow.app).replace(/\.desktop$/, '') : ''), String(sh.text).trim().length);
+      original = null; lastCopy = null; crossLinks = [];
+      clipStatus = 'Nothing to convert';
+      sendPill();
+      return null;
+    }
     if (!sh.text && !sh.html) {
       original = null;
       crossLinks = [];
@@ -554,12 +571,12 @@ function createCore(io) {
     }
     note('read', currentRule ? currentRule.name : (winNow && winNow.app ? String(winNow.app).replace(/\.desktop$/, '') : ''), (sh.text || '').length || (sh.html || '').length);
     const site = siteOf(sh.html);
-    if (site && site !== settings.atlassianSite) { settings.atlassianSite = site; save(); }
-    const context = copyWin && (copyWin.text === null || copyWin.text === sh.text) ? describeSource(copyWin.win, copyWin.rule, sh.html, { atlassian: settings.atlassianSite }) : null;
+    if (site) atlassianSite = site; // learned from what you copy, so it stays in memory: never written to disk
+    const context = copyWin && (copyWin.text === null || copyWin.text === sh.text) ? describeSource(copyWin.win, copyWin.rule, sh.html, { atlassian: atlassianSite }) : null;
     const clip = { html: sh.html || '', text: sh.text || '', context: context && context.label ? context : null };
     const r = FB.engine.run(clip, null);
     original = clip;
-    crossLinks = settings.crossLinks ? extractLinks(sh.text, sh.html, settings.atlassianSite) : [];
+    crossLinks = settings.crossLinks ? extractLinks(sh.text, sh.html, atlassianSite) : [];
     clipStatus = r.has ? 'Last copy: ' + (FB.SOURCES[r.source] || 'text') + ', ' + (FB.astStats(r.ast).summary || 'text') : 'Nothing to convert';
     const fromWin = copyWin && (copyWin.text === null || copyWin.text === sh.text) && copyWin.win ? appLabel(copyWin.win) : '';
     lastCopy = r.has ? { from: fromWin === 'another app' ? '' : fromWin, what: FB.astStats(r.ast).summary || 'Text' } : null;
@@ -871,7 +888,7 @@ function createCore(io) {
     if (kind === 'pdf') makePdf();
     if (kind === 'openpdf' && lastPdf) io.openPath(lastPdf);
     if (kind === 'showpdf' && lastPdf) io.showInFolder(lastPdf);
-    if (kind === 'openlink') { const idx = parseInt(arg, 10); if (crossLinks[idx] && crossLinks[idx].url) io.openUri(crossLinks[idx].url); }
+    if (kind === 'openlink') { const idx = parseInt(arg, 10); const u = crossLinks[idx] && crossLinks[idx].url; if (u && /^(https:\/\/|http:\/\/|mailto:)/i.test(u)) io.openUri(u); } // web and mail links only, never a file or an app's own scheme
     if (['view', 'theme', 'toggle', 'dest', 'size', 'dswap', 'dhide', 'dadd', 'dmove', 'dput', 'rule'].includes(kind)) onSettingsAction(kind, arg);
     if (kind === 'key' && /^[a-z]+$/.test(arg)) onShortcut(arg);
     if (kind === 'key' && /^\d{1,2}$/.test(arg)) onSettingsAction('key', arg);

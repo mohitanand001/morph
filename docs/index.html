@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Morph</title>
-<meta name="description" content="Morph re-shapes what you copy for the app you paste into: tables stay tables, lists stay lists. For GNOME on Linux. Your clipboard stays on your device.">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<meta name="description" content="Morph re-shapes what you copy for the app you paste into: tables stay tables, lists stay lists. For GNOME on Linux. Your clipboard stays on your computer.">
+<link rel="stylesheet" href="fonts/fonts.css">
 <style>
 /* Layout: a single centred column, a sticky step rail on wide screens, terminal blocks with real copy buttons.
    Colour: ink-teal on warm paper, one teal accent; tactile buttons (solid lower edge, sinks on press). */
@@ -102,7 +102,7 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
     <a class="dl" href="try.html">Try it in your browser<small>copy a sample, pick an app, see what pastes</small></a>
     <a class="ghost" href="https://github.com/mohitanand001/morph">Source on GitHub</a>
   </div>
-  <div class="chips"><span class="chip">Version 0.15.0-rc.13 · testing</span><span class="chip">Linux · GNOME</span><span class="chip">Source available</span></div>
+  <div class="chips"><span class="chip">Version 0.15.0-rc.14 · testing</span><span class="chip">Linux · GNOME</span><span class="chip">Source available</span></div>
 </header>
 
 <nav aria-label="Sections"><div class="in"><a href="try.html">Try it</a><a href="#install">Install</a><a href="#use">Use</a><a href="#privacy">Privacy</a><a href="#ocr">Image tables</a><a href="#update">Update</a><a href="#uninstall">Uninstall</a><a href="#help">Troubleshooting</a></div></nav>
@@ -131,7 +131,7 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
 
   <div class="step"><div class="n">3</div><div class="body">
     <h3>Prefer a package?</h3>
-    <p>A <a href="morph_0.15.0-rc.13_all.deb">.deb for Debian and Ubuntu</a> installs the same thing system-wide. Install it with <code>sudo apt install ./morph_0.15.0-rc.13_all.deb</code>, then open Morph from the app menu. Updates come from a newer .deb.</p>
+    <p>A <a href="morph_0.15.0-rc.14_all.deb">.deb for Debian and Ubuntu</a> installs the same thing system-wide. Install it with <code>sudo apt install ./morph_0.15.0-rc.14_all.deb</code>, then open Morph from the app menu. Updates come from a newer .deb.</p>
   </div></div>
 </section>
 
@@ -154,15 +154,15 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
   <p class="sub">A clipboard tool sees a lot, so here is exactly what Morph does. The code is open, so you can check it.</p>
   <div class="grid two">
     <div class="card"><h3>Stays on your computer</h3><p>Morph never stores what you copy and never sends it anywhere. Conversion happens locally.</p></div>
-    <div class="card"><h3>You choose where it works</h3><p>All apps by default, or only the apps you pick in Settings → Apps. Password managers and copies marked secret are always skipped.</p></div>
-    <div class="card"><h3>A log you can see</h3><p>Settings → Privacy lists what Morph read: the time, the app and the size, never the content.</p></div>
-    <div class="card"><h3>Network</h3><p>Only an optional daily update check and the optional image-tables download.</p></div>
+    <div class="card"><h3>You choose where it works</h3><p>All apps by default, or only the apps you pick in Settings → Apps. Password managers and copies marked secret are always skipped, and a lone word that could be a password is let go of at once.</p></div>
+    <div class="card"><h3>A log you can see</h3><p>Settings → Privacy lists what Morph read: the time, the app and the size, never the content. The list is kept in memory only.</p></div>
+    <div class="card"><h3>Network</h3><p>Only an optional daily update check (it asks for one small file, nothing is sent) and the optional image-tables download. Reading a table from an image never goes online. This website loads nothing from other sites.</p></div>
   </div>
 </section>
 
 <section id="ocr">
   <h2>Image tables (optional)</h2>
-  <p class="sub">Morph can read a table from a copied screenshot, on your computer, and only when you click an app. It's off by default because it downloads about 400 MB (RapidOCR). Turn it on in Settings → Image tables → <b>Turn on image tables</b>, or run:</p>
+  <p class="sub">Morph can read a table from a copied screenshot, on your computer, and only when you click an app. It's off by default because it downloads about 400 MB once: RapidOCR from PyPI, and its reading models from ModelScope, the RapidOCR project's model host (the models are checked against their fingerprints). After that it works offline. Turn it on in Settings → Image tables → <b>Turn on image tables</b>, or run:</p>
   <div class="term"><pre>morph --enable-ocr</pre><button class="copy" type="button">Copy</button></div>
 </section>
 

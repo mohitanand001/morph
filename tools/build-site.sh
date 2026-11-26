@@ -20,6 +20,8 @@ cp "$TMP/morph-$VER-linux.zip" "$TMP/version.json" "$TMP/try.html" "$DOCS/"
 # The .deb is published under a plain name (no ~), which every browser and server handles.
 cp "$TMP/morph_${DEBVER}_all.deb" "$DOCS/morph_${VER}_all.deb"
 cp "$SRC/site/install.sh" "$DOCS/install.sh"
+# Fonts are served from the site itself: a visit sends nothing to a font service.
+cp -r "$SRC/site/fonts" "$DOCS/fonts"
 sed -e "s/VERSION/$VER/g" -e "s/DEBFILE/morph_${VER}_all.deb/g" "$SRC/site/index.html" > "$DOCS/index.html"
 touch "$DOCS/.nojekyll"
 rm -rf "$TMP"

@@ -33,7 +33,7 @@ const out = path.join(tmp, 'try.html');
 execFileSync('node', [path.join(root, 'tools', 'build-demo.js'), out], { stdio: 'ignore' });
 const page = fs.readFileSync(out, 'utf8');
 check('the demo builds into one file under 400 KB', page.length > 100000 && page.length < 400 * 1024, String(page.length));
-check('it needs no other script or file (only fonts)', !/<script[^>]+src=/.test(page) && !/<link[^>]+href="(?!https:\/\/fonts\.googleapis\.com)/.test(page));
+check('it needs no other script, and loads nothing from other sites (its fonts come from the site itself)', !/<script[^>]+src=/.test(page) && !/<link[^>]+href="(?!fonts\/fonts\.css")/.test(page) && !/googleapis|gstatic/.test(page));
 check('no placeholder was left in it', !/__ENGINE__|__SAMPLES__|__APP__/.test(page));
 check('pasted pages are shown in a locked frame', /sandbox', 'allow-same-origin'/.test(page) && /default-src \\'none\\'/.test(page) && !/allow-scripts/.test(page));
 fs.rmSync(tmp, { recursive: true, force: true });

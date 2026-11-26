@@ -15,11 +15,19 @@ say "Downloading Morph from $BASE"
 meta="$(curl -fsSL --max-time 20 "$BASE/version.json")" || { say "Could not reach $BASE"; exit 1; }
 zip="$(field "$meta" zip)"; sha="$(field "$meta" sha256)"; ver="$(field "$meta" version)"
 [ -n "$zip" ] && [ -n "$sha" ] || { say "The version file did not look right."; exit 1; }
+# Only a Morph zip from this same website, with a real fingerprint.
+printf '%s' "$zip" | grep -Eq '^morph-[0-9A-Za-z.+-]+-linux\.zip$' || { say "The version file pointed somewhere unexpected, so nothing was installed."; exit 1; }
+printf '%s' "$sha" | grep -Eq '^[0-9a-f]{64}$' || { say "The version file did not look right."; exit 1; }
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 curl -fsSL --max-time 120 -o "$tmp/m.zip" "$BASE/$zip" || { say "Download failed."; exit 1; }
 echo "$sha  $tmp/m.zip" | sha256sum -c --quiet - || { say "The download did not match its fingerprint, so nothing was installed."; exit 1; }
 unzip -q "$tmp/m.zip" -d "$tmp/x"
 [ -f "$tmp/x/morph/daemon/gjs-main.js" ] || { say "The download did not contain Morph."; exit 1; }
+# Never unpack over a folder another program uses.
+if [ -d "$DEST" ] && [ -n "$(ls -A "$DEST" 2>/dev/null)" ] && [ ! -f "$DEST/daemon/gjs-main.js" ]; then
+  say "$DEST already holds files that are not Morph's, so nothing was installed. Choose another folder:  MORPH_DIR=~/morph bash install.sh"
+  exit 1
+fi
 mkdir -p "$DEST"
 cp -r "$tmp/x/morph/." "$DEST/"
 chmod +x "$DEST/bin/morph"

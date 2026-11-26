@@ -43,7 +43,7 @@ import { Slider } from 'resource:///org/gnome/shell/ui/slider.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const PILL_VERSION = 30;
+const PILL_VERSION = 31;
 const IFACE = `
 <node>
   <interface name="dev.morph.Focus">
@@ -85,6 +85,47 @@ const SECRET_MIME = /x-kde-passwordmanagerhint|concealedtype|org\.nspasteboard\.
 const CB = St.ClipboardType.CLIPBOARD;
 
 const b64 = (s) => GLib.base64_encode(new TextEncoder().encode(s));
+
+// ---- Who may talk to this helper
+// GNOME Shell can read the clipboard of any app, see window titles and press keys for you. Through this helper
+// only Morph's own background program may: it must hold the bus name dev.morph.Daemon, run gjs on a
+// .../daemon/gjs-main.js script, and live in this desktop session (not inside a Flatpak or Snap sandbox).
+// Every other caller gets "access denied", and the helper's signals go only to Morph, never to the whole bus.
+const DAEMON_NAME = 'dev.morph.Daemon';
+const OBJ_PATH = '/dev/morph/Focus';
+const IFACE_NAME = 'dev.morph.Focus';
+const METHOD_OUT = { Get: '(s)', SetPill: null, ReadClipboard: '(s)', ReadImage: '(s)', Paste: null, SetShortcuts: '(s)', WriteClipboard: null };
+function readLink(p) { try { return GLib.file_read_link(p); } catch (e) { return ''; } }
+function isMorphDaemon(pid) {
+  try {
+    if (!Number.isInteger(pid) || pid <= 1) return false;
+    const mnt = readLink('/proc/' + pid + '/ns/mnt');
+    if (!mnt || mnt !== readLink('/proc/self/ns/mnt')) return false; // a sandboxed app lives in its own mount namespace
+    const exe = readLink('/proc/' + pid + '/exe');
+    if (!/\/gjs(-console)?$/.test(exe)) return false;
+    const [ok, bytes] = GLib.file_get_contents('/proc/' + pid + '/cmdline');
+    if (!ok) return false;
+    const args = new TextDecoder().decode(bytes).split('\0').filter(Boolean);
+    const script = args.find((a) => /\/daemon\/gjs-main\.js$/.test(a));
+    if (!script) return false;
+    const appDir = GLib.path_get_dirname(GLib.path_get_dirname(script));
+    return GLib.file_test(GLib.build_filenamev([appDir, 'bin', 'morph']), GLib.FileTest.EXISTS);
+  } catch (e) { return false; }
+}
+function pidOf(conn, name) {
+  try {
+    const r = conn.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', 'GetConnectionUnixProcessID',
+      new GLib.Variant('(s)', [name]), new GLib.VariantType('(u)'), Gio.DBusCallFlags.NONE, 1000, null);
+    return r.deepUnpack()[0];
+  } catch (e) { return -1; }
+}
+function ownerOf(conn, name) {
+  try {
+    const r = conn.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', 'GetNameOwner',
+      new GLib.Variant('(s)', [name]), new GLib.VariantType('(s)'), Gio.DBusCallFlags.NONE, 1000, null);
+    return r.deepUnpack()[0];
+  } catch (e) { return ''; }
+}
 const unb64 = (s) => new TextDecoder().decode(GLib.base64_decode(s));
 const str = (v, max) => String(v === undefined || v === null ? '' : v).slice(0, max || 80);
 
@@ -126,8 +167,13 @@ export default class FormatBridgeHelper extends Extension {
       this._action('key:' + k.id);
     });
 
-    this._dbus = Gio.DBusExportedObject.wrapJSObject(IFACE, this);
-    this._dbus.export(Gio.DBus.session, '/dev/morph/Focus');
+    this._peer = null;
+    this._dbus = Gio.DBusExportedObject.wrapJSObject(IFACE, this._guarded());
+    this._dbus.export(Gio.DBus.session, OBJ_PATH);
+    // Morph's program may start before or after this helper: adopt it whenever it (re)appears.
+    this._watchId = Gio.bus_watch_name(Gio.BusType.SESSION, DAEMON_NAME, Gio.BusNameWatcherFlags.NONE,
+      (conn, _name, owner) => { this._peer = isMorphDaemon(pidOf(conn, owner)) ? owner : null; if (this._peer) this._emit(); },
+      () => { this._peer = null; });
     this._focusId = global.display.connect('notify::focus-window', () => this._focusChanged());
     this._track();
     this._buildPill();
@@ -135,7 +181,7 @@ export default class FormatBridgeHelper extends Extension {
     // New copies, in any app.
     this._selection = global.display.get_selection();
     this._ownerId = this._selection.connect('owner-changed', (_sel, type) => {
-      if (type === Meta.SelectionType.SELECTION_CLIPBOARD && this._dbus) this._dbus.emit_signal('ClipboardChanged', new GLib.Variant('(s)', ['']));
+      if (type === Meta.SelectionType.SELECTION_CLIPBOARD && this._dbus) this._signal('ClipboardChanged', new GLib.Variant('(s)', ['']));
     });
     // A click anywhere else tucks the pill away.
     this._captureId = global.stage.connect('captured-event', (_stage, event) => this._outsideClick(event));
@@ -180,9 +226,44 @@ export default class FormatBridgeHelper extends Extension {
     }
     if (this._dbus) this._dbus.unexport();
     this._dbus = null;
+    if (this._watchId) { Gio.bus_unwatch_name(this._watchId); this._watchId = 0; }
+    this._peer = null;
   }
 
   // ------------------------------------------------------------ D-Bus
+  // The object on the bus: every method checks the caller first, then hands over to the real one below.
+  _guarded() {
+    const g = {};
+    Object.keys(METHOD_OUT).forEach((m) => {
+      g[m + 'Async'] = (params, invocation) => {
+        if (!this._allowed(invocation)) {
+          invocation.return_dbus_error('org.freedesktop.DBus.Error.AccessDenied', 'Only Morph may use this.');
+          return;
+        }
+        if (typeof this[m + 'Async'] === 'function') { this[m + 'Async'](params, invocation); return; }
+        try {
+          const out = this[m](...params);
+          invocation.return_value(METHOD_OUT[m] ? new GLib.Variant(METHOD_OUT[m], [out]) : null);
+        } catch (e) { invocation.return_dbus_error('org.freedesktop.DBus.Error.Failed', 'Failed'); }
+      };
+    });
+    return g;
+  }
+  _allowed(invocation) {
+    const sender = invocation.get_sender();
+    if (!sender) return false;
+    if (sender === this._peer) return true;
+    // Morph's program called before the bus told us it appeared: check it now, once.
+    const conn = invocation.get_connection();
+    if (ownerOf(conn, DAEMON_NAME) === sender && isMorphDaemon(pidOf(conn, sender))) { this._peer = sender; return true; }
+    log('morph: refused a call from a program that is not Morph');
+    return false;
+  }
+  // Signals go to Morph's program only, never to everyone on the bus.
+  _signal(name, value) {
+    if (!this._peer) return;
+    try { Gio.DBus.session.emit_signal(this._peer, OBJ_PATH, IFACE_NAME, name, value); } catch (e) { /* gone */ }
+  }
   Get() {
     const w = global.display.focus_window;
     const data = w ? { app: w.get_wm_class() || w.get_gtk_application_id() || '', title: w.get_title() || '' } : { app: '', title: '' };
@@ -314,11 +395,11 @@ export default class FormatBridgeHelper extends Extension {
   }
 
   _emit() {
-    if (this._dbus) this._dbus.emit_signal('Changed', new GLib.Variant('(s)', [this.Get()]));
+    if (this._dbus) this._signal('Changed', new GLib.Variant('(s)', [this.Get()]));
   }
   _action(a) {
     if (!ACTION_RE.test(a)) return;
-    if (this._dbus) this._dbus.emit_signal('Action', new GLib.Variant('(s)', [a]));
+    if (this._dbus) this._signal('Action', new GLib.Variant('(s)', [a]));
     this._armIdle();
   }
 

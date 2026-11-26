@@ -197,14 +197,16 @@ const general = (d, c) => { c.action('view:settings'); return d.last().pane.opts
     const home = path.join(tmp, 'home'); fs.mkdirSync(home);
     const mk = (f, c) => { fs.mkdirSync(path.dirname(path.join(home, f)), { recursive: true }); fs.writeFileSync(path.join(home, f), c || 'x'); };
     execFileSync('unzip', ['-q', path.join(site, meta.zip), '-d', home]);
-    mk('.config/morph/settings.json'); mk('.config/autostart/morph.desktop'); mk('.cache/morph.log'); mk('.local/bin/morph');
-    mk('.local/share/morph-ocr/ready'); mk('.cache/formatter-icons/slack.svg'); mk('.config/formatter/settings.json'); mk('run/morph/clip-image.png');
+    // Morph's own files, marked the way Morph writes them (other programs' look-alikes: test/uninstall-safety.test.js)
+    mk('.config/morph/settings.json', '{"pillMode":"always"}'); mk('.config/autostart/morph.desktop', 'Exec=gjs -m "' + path.join(home, 'morph', 'daemon', 'gjs-main.js') + '"'); mk('.cache/morph.log');
+    fs.mkdirSync(path.join(home, '.local', 'bin'), { recursive: true }); fs.symlinkSync(path.join(home, 'morph', 'bin', 'morph'), path.join(home, '.local', 'bin', 'morph'));
+    mk('.local/share/morph-ocr/ready'); mk('.config/formatter/settings.json', '{"pillMode":"apps"}'); mk('run/morph/clip-image.png');
     mk('.bashrc', 'keep me\n# morph PATH\nexport PATH="$HOME/.local/bin:$PATH"\nkeep me too\n');
     const penv = Object.assign({}, process.env, { HOME: home, XDG_CONFIG_HOME: '', XDG_CACHE_HOME: '', XDG_RUNTIME_DIR: path.join(home, 'run') });
     delete penv.XDG_CONFIG_HOME; delete penv.XDG_CACHE_HOME;
     const pr = spawnSync('bash', [path.join(home, 'morph', 'bin', 'morph'), '--uninstall'], { env: penv, encoding: 'utf8' });
     check('--uninstall succeeds', pr.status === 0, pr.stdout + pr.stderr);
-    check('--uninstall leaves no trace: settings, login entry, command, log, OCR, caches, old Formatter data and the folder', ['.config/morph', '.config/formatter', '.config/autostart/morph.desktop', '.local/bin/morph', '.cache/morph.log', '.local/share/morph-ocr', '.cache/formatter-icons', 'run/morph', 'morph'].every((f) => !fs.existsSync(path.join(home, f))), pr.stdout);
+    check('--uninstall leaves no trace: settings, login entry, command, log, OCR, caches, old Formatter data and the folder', ['.config/morph', '.config/formatter', '.config/autostart/morph.desktop', '.local/bin/morph', '.cache/morph.log', '.local/share/morph-ocr', 'run/morph', 'morph'].every((f) => { try { fs.lstatSync(path.join(home, f)); return false; } catch (e) { return true; } }), pr.stdout);
     const rc = fs.readFileSync(path.join(home, '.bashrc'), 'utf8');
     check('--uninstall takes only its own lines out of .bashrc', rc === 'keep me\nkeep me too\n', JSON.stringify(rc));
     // A folder that isn't Morph's is left alone.
