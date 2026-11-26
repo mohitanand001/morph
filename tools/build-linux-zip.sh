@@ -27,6 +27,8 @@ Needs: GNOME (Ubuntu, Fedora Workstation...) with gjs, which is already part of 
 Nothing you copy leaves your computer.
 TXT
 chmod +x "$DIR/bin/morph"
+# Every file the download holds, so --uninstall and --update can delete Morph's files by name (never a whole folder).
+(cd "$DIR" && { find . -type f ! -name MANIFEST | sed 's#^\./##' | LC_ALL=C sort; echo MANIFEST; }) > "$DIR/MANIFEST"
 rm -f "$OUT/morph-$VER-linux.zip"
 (cd "$STAGE" && zip -qr "$OUT/morph-$VER-linux.zip" morph)
 rm -rf "$STAGE"

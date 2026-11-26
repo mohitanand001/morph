@@ -40,7 +40,9 @@ function unpackMorph(dest) {
   fs.symlinkSync(app + '/bin/morph', home + '/.local/bin/morph');
   put(home + '/.config/autostart/morph.desktop', '[Desktop Entry]\nExec=gjs -m "' + app + '/daemon/gjs-main.js"\n');
   put(home + '/.cache/morph.log', 'log');
-  put(home + '/.local/share/morph-ocr/ready', '');
+  put(home + '/.local/share/morph-ocr/ready', ''); put(home + '/.local/share/morph-ocr/engine', 'rapidocr'); put(home + '/.local/share/morph-ocr/venv/lib/x.py', 'x');
+  put(home + '/.local/share/morph-ocr/venv/lib/__pycache__/x.cpython-313.pyc', 'x');
+  put(home + '/.local/share/morph-ocr/MANIFEST', 'ready\nengine\nvenv/lib/x.py\nMANIFEST\n');
   put(home + '/run/morph/clip-image-1-2.png', 'x');
   put(home + '/.bashrc', 'alias ll="ls -l"\n# my morph PATH notes\nexport KEEP_ME=1\n\n# morph PATH\nexport PATH="$HOME/.local/bin:$PATH"\nexport AFTER=1\n');
   // Other programs' look-alikes
@@ -66,7 +68,15 @@ function unpackMorph(dest) {
   check('another program\'s file in the private folder is kept', exists(home + '/run/morph/notes.txt'));
   const rc = fs.readFileSync(home + '/.bashrc', 'utf8');
   check('~/.bashrc loses exactly Morph\'s two lines', !/^# morph PATH$/m.test(rc) && /# my morph PATH notes\nexport KEEP_ME=1/.test(rc) && /export AFTER=1/.test(rc) && /alias ll/.test(rc), JSON.stringify(rc));
-  check('the entries the uninstall removes cover everything the download contains', entries.every((e) => ['bin', 'daemon', 'lib', 'src', 'gnome-extension', 'ocr', 'LICENSE', 'README.txt', 'package.json'].includes(e)), entries.join(','));
+  check('the download lists every file it holds, so each can be removed by name', entries.includes('MANIFEST'));
+  // A file in the image-tables folder that Morph never listed stays, and so does the folder.
+  {
+    const { home: h2, env: e2 } = freshHome();
+    const a2 = h2 + '/.local/share/morph'; unpackMorph(a2);
+    put(h2 + '/.local/share/morph-ocr/engine', 'rapidocr'); put(h2 + '/.local/share/morph-ocr/MANIFEST', 'engine\nMANIFEST\n'); put(h2 + '/.local/share/morph-ocr/yours.txt', 'not listed');
+    spawnSync('bash', [a2 + '/bin/morph', '--uninstall'], { env: e2, encoding: 'utf8' });
+    check('an unlisted file in the image-tables folder is kept', exists(h2 + '/.local/share/morph-ocr/yours.txt') && !exists(h2 + '/.local/share/morph-ocr/engine'));
+  }
 }
 
 // 2) A folder that only looks like Morph is never deleted wholesale
@@ -97,7 +107,7 @@ function unpackMorph(dest) {
   const kills = sh.split('\n').filter((l) => /\b(pkill|killall|kill)\b/.test(l) && !/^\s*#/.test(l));
   check('the only processes stopped are Morph\'s own', kills.length > 0 && kills.every((l) => /pkill -f "gjs\.\*\$MAIN"/.test(l)), kills.join(' | '));
   const rms = sh.split('\n').filter((l) => /\brm -r?f\b/.test(l) && !/^\s*#/.test(l));
-  check('every recursive delete names a Morph path', rms.filter((l) => /rm -rf/.test(l)).every((l) => /\$tmp|\$STAGE|\$OCR_DIR|\$dir"|\$\{d:\?\}/.test(l)), rms.filter((l) => /rm -rf/.test(l)).join(' | '));
+  check('nothing deletes a folder with what is inside it: no rm -r anywhere that runs on your computer', ['bin/morph', 'site/install.sh', 'daemon/gjs-main.js', 'gnome-extension/morph-focus@morph.dev/extension.js'].every((f) => !/\brm\s+-[a-zA-Z]*r/.test(fs.readFileSync(path.join(SRC, f), 'utf8'))) && !/rm -r/.test(fs.readFileSync(path.join(SRC, 'tools/build-deb.sh'), 'utf8').split('DEBIAN/prerm')[1].split('chmod')[0]));
   check('the update only accepts a Morph zip from the same website', /\^morph-\[0-9A-Za-z\.\+-\]\+-linux\\\\?\.zip\$/.test(sh) && !/case "\$zip" in http/.test(sh));
 }
 

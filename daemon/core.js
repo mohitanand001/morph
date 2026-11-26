@@ -222,10 +222,10 @@ function createCore(io) {
       return [{ kind: 'panel', tone: 'ok', icon: 'check_circle', title: 'Image tables are on', text: 'A copied image is read only when you pick an app, on this computer. Nothing is uploaded.' },
         ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Remove image tables', action: 'ocr:askoff', kind: 'secondary' }] }] : [])];
     }
-    if (ocrAsk === 'on' && ocrCanManage()) return ask('Download ' + OCR_SIZE + '?', 'This downloads RapidOCR once, from PyPI and its models from ModelScope (the RapidOCR project\'s model host). Images are read only on this computer, offline, and only when you pick an app.' + (ocrLegacy() ? ' The older, larger version (about 3 GB) is removed first.' : ''), 'Install', 'ocr:on', 'Not now');
+    if (ocrAsk === 'on' && ocrCanManage()) return ask('Download ' + OCR_SIZE + '?', 'This downloads RapidOCR once, from PyPI and its models from ModelScope (the RapidOCR project\'s model host). Images are read only on this computer, offline, and only when you pick an app.', 'Install', 'ocr:on', 'Not now');
     if (ocrLegacy()) {
-      return [{ kind: 'panel', tone: 'warn', icon: 'download', title: 'Image tables got much smaller', text: 'The new version is ' + OCR_SIZE + ' instead of 3 GB, and reads a screenshot in a few seconds. Update to keep reading tables from images.' },
-        ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Update image tables', action: 'ocr:ask', kind: 'primary' }] }] : [])];
+      return [{ kind: 'panel', tone: 'warn', icon: 'download', title: 'Image tables got much smaller', text: 'The new version is ' + OCR_SIZE + ' instead of 3 GB. Morph never deletes a whole folder, so remove the old one yourself: delete the morph-ocr folder, then turn image tables on again.' },
+        ...(io.showInFolder && io.ocr.dir ? [{ kind: 'buttons', buttons: [{ label: 'Show the old folder', action: 'ocr:folder', kind: 'primary' }] }] : [])];
     }
     return [{ kind: 'panel', tone: ocrFail ? 'warn' : 'plain', icon: ocrFail ? 'warning' : 'table', title: ocrFail ? 'Couldn’t turn on image tables' : 'Image tables (optional)',
         text: ocrFail ? ocrFail : 'Reads tables from copied screenshots, on this computer. Off until you turn it on.' },
@@ -894,6 +894,7 @@ function createCore(io) {
     if (kind === 'key' && /^\d{1,2}$/.test(arg)) onSettingsAction('key', arg);
     if (kind === 'refresh') refreshClip();
     if (kind === 'setup' && /^(ok|settings)$/.test(arg)) finishWelcome(arg);
+    if (kind === 'ocr' && arg === 'folder' && io.ocr && io.ocr.dir) io.showInFolder(io.ocr.dir);
     if (kind === 'ocr' && /^(on|off|cancel|ask|askstop|askoff|no)$/.test(arg)) ocrAction(arg);
     if (kind === 'update') runUpdate();
     if (kind === 'checkupdate') checkNow();

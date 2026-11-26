@@ -18,9 +18,17 @@ zip="$(field "$meta" zip)"; sha="$(field "$meta" sha256)"; ver="$(field "$meta" 
 # Only a Morph zip from this same website, with a real fingerprint.
 printf '%s' "$zip" | grep -Eq '^morph-[0-9A-Za-z.+-]+-linux\.zip$' || { say "The version file pointed somewhere unexpected, so nothing was installed."; exit 1; }
 printf '%s' "$sha" | grep -Eq '^[0-9a-f]{64}$' || { say "The version file did not look right."; exit 1; }
-tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+tmp="$(mktemp -d)"
+# The temporary folder is emptied by name: the zip, then each file the zip's own list names. Never a whole folder.
+clean_tmp() {
+  if [ -f "$tmp/files" ]; then while IFS= read -r f; do case "$f" in ''|/*|*..*) continue ;; esac; [ -d "$tmp/x/$f" ] || rm -f -- "$tmp/x/$f"; done < "$tmp/files"; fi
+  rm -f -- "$tmp/m.zip" "$tmp/files"
+  find "$tmp" -depth -type d -empty -exec rmdir -- {} \; 2>/dev/null || true
+}
+trap clean_tmp EXIT
 curl -fsSL --max-time 120 -o "$tmp/m.zip" "$BASE/$zip" || { say "Download failed."; exit 1; }
 echo "$sha  $tmp/m.zip" | sha256sum -c --quiet - || { say "The download did not match its fingerprint, so nothing was installed."; exit 1; }
+unzip -Z1 "$tmp/m.zip" > "$tmp/files"
 unzip -q "$tmp/m.zip" -d "$tmp/x"
 [ -f "$tmp/x/morph/daemon/gjs-main.js" ] || { say "The download did not contain Morph."; exit 1; }
 # Never unpack over a folder another program uses.

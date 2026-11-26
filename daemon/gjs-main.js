@@ -173,6 +173,7 @@ function ocrLog(text) {
 }
 let ocrProc = null;
 const ocr = {
+  dir: OCR_DIR,
   // ready: the small RapidOCR install is in place. legacy: an older PaddleOCR install that should be replaced.
   ready: () => GLib.file_test(GLib.build_filenamev([OCR_DIR, 'ready']), GLib.FileTest.EXISTS) && ocrEngine() === 'rapidocr',
   legacy: () => GLib.file_test(GLib.build_filenamev([OCR_DIR, 'ready']), GLib.FileTest.EXISTS) && ocrEngine() !== 'rapidocr',

@@ -20,7 +20,7 @@ check('OCR worker answers with one JSON line even when it cannot read', usage.st
 const bin = fs.readFileSync(path.join(root, 'bin', 'morph'), 'utf8');
 check('morph has --enable-ocr and --disable-ocr', /--enable-ocr\)\s+do_enable_ocr/.test(bin) && /--disable-ocr\)\s+do_disable_ocr/.test(bin));
 check('OCR lives outside the app folder so updates keep it', /OCR_DIR="\$\{XDG_DATA_HOME:-\$HOME\/\.local\/share\}\/morph-ocr"/.test(bin));
-check('a failed OCR install leaves nothing behind', /install failed[\s\S]*rm -rf "\$OCR_DIR"/.test(bin));
+check('a failed OCR install takes out, by name, the files it recorded', /install failed[^\n]*record_files "\$OCR_DIR"; remove_ocr_files/.test(bin) && !/rm -r/.test(bin));
 check('the zip ships the worker', /ocr\/morph_ocr\.py/.test(fs.readFileSync(path.join(root, 'tools', 'build-linux-zip.sh'), 'utf8')));
 
 // How Morph uses it.
@@ -144,8 +144,8 @@ function desk(opts) {
       const gj = fs2.readFileSync(path2.join(__dirname, '..', 'daemon', 'gjs-main.js'), 'utf8');
       check('OCR is installed into its own Python environment, never the system or user one', /python3 -m venv "\$OCR_DIR\/venv"/.test(sh) && !/--system-site-packages/.test(sh) && !/pip install --user/.test(sh) && /--no-cache-dir/.test(sh));
       check('OCR runs (warm-up and reads) keep any caches inside the OCR folder', /HOME="\$OCR_DIR\/home" PYTHONNOUSERSITE=1/.test(sh) && /ocr_run "\$OCR_DIR\/venv\/bin\/python"/.test(sh) && /setenv\('HOME', ocrHome/.test(gj) && /setenv\('PYTHONNOUSERSITE'/.test(gj));
-      check('the installer uses RapidOCR (small), replaces an older PaddleOCR install, and marks the engine', /rapidocr>=2,<4/.test(sh) && /rapidocr_onnxruntime/.test(sh) && !/paddlepaddle/.test(sh) && /Removed the older, larger image-tables version/.test(sh) && /-f "\$OCR_DIR\/ready" \]/.test(sh) && /printf 'rapidocr' > "\$OCR_DIR\/engine"/.test(sh));
-      check('uninstall and Remove delete only Morph\'s OCR folder and log', /case "\$OCR_DIR" in \*\/morph-ocr\) rm -rf "\$OCR_DIR" ;; esac/.test(sh) && /morph-ocr\.log/.test(sh) && /\*\/morph-ocr\) rm -rf "\$OCR_DIR"/.test(sh) && !/paddlex/.test(sh.replace(/~\/\.paddlex/g, '')));
+      check('the installer uses RapidOCR (small), replaces an older PaddleOCR install, and marks the engine', /rapidocr>=2,<4/.test(sh) && /rapidocr_onnxruntime/.test(sh) && !/paddlepaddle/.test(sh) && /Delete that folder yourself/.test(sh) && /-f "\$OCR_DIR\/ready" \]/.test(sh) && /printf 'rapidocr' > "\$OCR_DIR\/engine"/.test(sh));
+      check('uninstall and Remove delete only Morph\'s OCR folder and log', /case "\$OCR_DIR" in \*\/morph-ocr\) ;; \*\) return 0 ;; esac/.test(sh) && /delete_listed "\$OCR_DIR"/.test(sh) && /morph-ocr\.log/.test(sh) && !/rm -r/.test(sh) && !/paddlex/.test(sh.replace(/~\/\.paddlex/g, '')));
     }
     check('the installer prints the four steps', (require('fs').readFileSync(require('path').join(__dirname, '..', 'bin', 'morph'), 'utf8').match(/say "Step \d of 4:/g) || []).length === 4);
     state.installing.onLine('Step 4 of 4: Getting the text models ready (one time)...');
@@ -171,15 +171,17 @@ function desk(opts) {
   {
     // An older PaddleOCR install: Settings offers to replace it with the small one.
     const d = desk({});
-    d.io.ocr = { ready: () => false, legacy: () => true, run: async () => ({ ok: false }), install: () => {}, remove: async () => true, cancel: () => {} };
+    d.io.ocr = { dir: '/h/.local/share/morph-ocr', ready: () => false, legacy: () => true, run: async () => ({ ok: false }), install: () => {}, remove: async () => true, cancel: () => {} };
     const c = createCore(d.io);
     await c.start();
     c.focus({ app: 'slack', title: 'x - Slack' }, 15);
     c.action('view:ocr');
     const b = () => JSON.stringify(d.last().pane.blocks);
-    check('an older, larger install is offered an update to the small one', /Image tables got much smaller/.test(b()) && /Update image tables/.test(b()));
-    c.action('ocr:ask');
-    check('…and the question says the old one is removed first', /about 3 GB\) is removed first/.test(b()));
+    check('an older, larger install: Morph explains it never deletes a whole folder and shows where it is', /Image tables got much smaller/.test(b()) && /never deletes a whole folder/.test(b()) && /ocr:folder/.test(b()));
+    let shown = '';
+    d.io.showInFolder = (p) => { shown = p; };
+    c.action('ocr:folder');
+    check('…and Show the old folder opens it', shown === '/h/.local/share/morph-ocr');
   }
   {
     // Real RapidOCR output for a salary-sheet screenshot (title, logo, a 5-column grid): the table comes out exactly.

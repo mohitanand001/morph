@@ -200,7 +200,7 @@ const general = (d, c) => { c.action('view:settings'); return d.last().pane.opts
     // Morph's own files, marked the way Morph writes them (other programs' look-alikes: test/uninstall-safety.test.js)
     mk('.config/morph/settings.json', '{"pillMode":"always"}'); mk('.config/autostart/morph.desktop', 'Exec=gjs -m "' + path.join(home, 'morph', 'daemon', 'gjs-main.js') + '"'); mk('.cache/morph.log');
     fs.mkdirSync(path.join(home, '.local', 'bin'), { recursive: true }); fs.symlinkSync(path.join(home, 'morph', 'bin', 'morph'), path.join(home, '.local', 'bin', 'morph'));
-    mk('.local/share/morph-ocr/ready'); mk('.config/formatter/settings.json', '{"pillMode":"apps"}'); mk('run/morph/clip-image.png');
+    mk('.local/share/morph-ocr/ready'); mk('.local/share/morph-ocr/engine', 'rapidocr'); mk('.local/share/morph-ocr/MANIFEST', 'ready\nengine\nMANIFEST\n'); mk('.config/formatter/settings.json', '{"pillMode":"apps"}'); mk('run/morph/clip-image.png');
     mk('.bashrc', 'keep me\n# morph PATH\nexport PATH="$HOME/.local/bin:$PATH"\nkeep me too\n');
     const penv = Object.assign({}, process.env, { HOME: home, XDG_CONFIG_HOME: '', XDG_CACHE_HOME: '', XDG_RUNTIME_DIR: path.join(home, 'run') });
     delete penv.XDG_CONFIG_HOME; delete penv.XDG_CACHE_HOME;
