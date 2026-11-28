@@ -36,8 +36,9 @@ jobs:
           # Each result as an annotation, so it can be read without opening the logs.
           node -e '
             const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-            for (const x of r.results) console.log((x.ok ? "::notice title=ok::" : "::error title=FAIL::") + x.name + (x.ok ? "" : " | " + String(x.detail).replace(/[\r\n%]/g, " ").slice(0, 300)));
-            console.log("::notice title=summary::" + r.passed + " passed, " + r.failed + " failed on macOS " + r.macOS);
+            const clean = (t) => String(t).replace(/[\r\n%]/g, " ");
+            for (const x of r.results.filter((x) => !x.ok)) console.log("::error title=FAIL::" + clean(x.name + " | " + x.detail).slice(0, 400));
+            console.log("::notice title=summary::" + r.passed + " passed, " + r.failed + " failed on macOS " + r.macOS + " :: " + clean(r.results.map((x) => (x.ok ? "ok " : "FAIL ") + x.name).join(" ; ")));
           ' "$RUNNER_TEMP/selftest/results.json" || echo "::error title=FAIL::the self-test wrote no results (exit $code)"
           cp mac/build/Morph-mac.zip mac/build/Morph-mac.zip.sha256 "$RUNNER_TEMP/selftest/" || true
           tail -n 60 "$MORPH_HOME/Logs/Morph.log" 2>/dev/null || true

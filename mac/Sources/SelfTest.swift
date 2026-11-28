@@ -112,9 +112,22 @@ final class SelfTest: NSObject, NSApplicationDelegate {
             self.check("the panel draws and reports its size", w > 20 && ["welcome", "tab"].contains(last["mode"] as? String ?? ""), Json.string(last))
             self.check("the window shows at that size", self.panel.window.isVisible && Int(self.panel.window.frame.width) == w, "\(self.panel.window.frame)")
             self.panel.web.takeSnapshot(with: nil) { image, _ in
-                if let image = image, let tiff = image.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
-                    try? png.write(to: URL(fileURLWithPath: (self.out as NSString).deletingLastPathComponent).appendingPathComponent("panel.png"))
+                var painted = 0.0
+                if let image = image, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                    if let png = rep.representation(using: .png, properties: [:]) {
+                        try? png.write(to: URL(fileURLWithPath: (self.out as NSString).deletingLastPathComponent).appendingPathComponent("panel.png"))
+                    }
+                    // How much of it is Morph's cream: the page really painted, in its own colours.
+                    var cream = 0, all = 0
+                    for x in stride(from: 0, to: rep.pixelsWide, by: 2) {
+                        for y in stride(from: 0, to: rep.pixelsHigh, by: 2) {
+                            all += 1
+                            if let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB), c.alphaComponent > 0.9, c.redComponent > 0.9, c.greenComponent > 0.88, c.blueComponent > 0.78, c.blueComponent < 0.93 { cream += 1 }
+                        }
+                    }
+                    painted = all > 0 ? Double(cream) / Double(all) : 0
                 }
+                self.check("the panel is painted in Morph's colours (\(Int(painted * 100))% cream)", painted > 0.3)
                 next()
             }
         }
