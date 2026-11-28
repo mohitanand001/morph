@@ -61,7 +61,12 @@ jobs:
         with:
           node-version: 22
       - run: bash mac/build.sh >/dev/null
-      - run: bash mac/lab/run.sh "$RUNNER_TEMP/maclab-out"
+      - name: lab
+        run: |
+          bash -x mac/lab/run.sh "$RUNNER_TEMP/maclab-out" 2>"$RUNNER_TEMP/trace.txt" || {
+            printf '::notice title=trace::%s\n' "$(tail -n 30 "$RUNNER_TEMP/trace.txt" | tr '\n%' '  ' | cut -c1-3800)"
+            exit 1
+          }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
