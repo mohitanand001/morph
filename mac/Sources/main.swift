@@ -47,11 +47,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// --lab-update <version> and --lab-uninstall: run the real update or uninstall on this copy of the app, for the lab
+/// (CI only: they refuse to run without MORPH_HOME, so they can never touch a person's own Morph settings).
+final class LabTask: NSObject, NSApplicationDelegate {
+    let what: String, arg: String
+    init(_ what: String, _ arg: String) { self.what = what; self.arg = arg }
+    func applicationDidFinishLaunching(_ n: Notification) {
+        guard ProcessInfo.processInfo.environment["MORPH_HOME"] != nil else { print("Needs MORPH_HOME."); exit(2) }
+        let paths = Paths.standard()
+        Log.url = paths.log
+        if what == "--lab-update" {
+            Updater.install(version: arg) { ok in print(ok ? "updated" : "update failed"); if !ok { exit(1) } }
+        } else {
+            print(Uninstaller.run(paths: paths) ? "uninstalled" : "uninstall failed")
+        }
+    }
+}
+
 let args = CommandLine.arguments
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 let appDelegate: NSApplicationDelegate
-if args.count >= 2 && args[1] == "--selftest" {
+if args.count >= 2 && (args[1] == "--lab-update" || args[1] == "--lab-uninstall") {
+    appDelegate = LabTask(args[1], args.count >= 3 ? args[2] : "")
+} else if args.count >= 2 && args[1] == "--lab" {
+    appDelegate = Lab(out: args.count >= 3 ? args[2] : "/dev/stdout")
+} else if args.count >= 2 && args[1] == "--selftest" {
     appDelegate = SelfTest(out: args.count >= 3 ? args[2] : "/dev/stdout")
 } else {
     appDelegate = AppDelegate()

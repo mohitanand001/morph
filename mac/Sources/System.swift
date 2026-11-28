@@ -140,3 +140,36 @@ final class Hotkeys {
         "f9": kVK_F9, "f10": kVK_F10, "f11": kVK_F11, "f12": kVK_F12,
     ]
 }
+
+/// The Mac's permissions Morph needs, and where to change them.
+enum Permissions {
+    /// Reading what other apps copied (macOS 15.4 and newer may ask first): allow, ask, deny, default or none.
+    static func pasteAccess() -> String {
+        #if compiler(>=6.1)
+        if #available(macOS 15.4, *) {
+            switch NSPasteboard.general.accessBehavior {
+            case .alwaysAllow: return "allow"
+            case .ask: return "ask"
+            case .alwaysDeny: return "deny"
+            case .default: return "default"
+            @unknown default: return "default"
+            }
+        }
+        #endif
+        return "none"
+    }
+    /// Opens the right page of System Settings. For Accessibility, the Mac first adds Morph to the list and asks.
+    static func open(_ what: String) {
+        var url = "x-apple.systempreferences:com.apple.preference.security?Privacy"
+        if what == "ax" {
+            if !AXIsProcessTrusted() {
+                let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+                _ = AXIsProcessTrustedWithOptions(opts)
+            }
+            url = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        } else if what == "paste" {
+            url = "x-apple.systempreferences:com.apple.preference.security?Privacy_Pasteboard"
+        }
+        if let u = URL(string: url) { NSWorkspace.shared.open(u) }
+    }
+}

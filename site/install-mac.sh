@@ -30,7 +30,8 @@ ditto -x -k "$tmp/Morph-mac.zip" "$tmp/x"
 # /Applications when you can write there, else Applications in your home folder.
 if [ -n "${MORPH_APPS:-}" ]; then APPS="$MORPH_APPS"; elif [ -w /Applications ]; then APPS=/Applications; else APPS="$HOME/Applications"; fi
 mkdir -p "$APPS"
-osascript -e 'tell application id "dev.morph.app" to quit' >/dev/null 2>&1 || true
+# A running Morph is stopped first (only Morph.app's own program, found by its path).
+for pid in $(pgrep -f '/Morph\.app/Contents/MacOS/Morph$' || true); do kill "$pid" 2>/dev/null || true; done
 sleep 1
 if [ -e "$APPS/Morph.app" ]; then
   mkdir -p "$HOME/.Trash"

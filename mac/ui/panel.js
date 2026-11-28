@@ -594,6 +594,10 @@
   };
   window.morphClose = function morphClose() { if (open && !press && !reorder) setOpen(false); };
   window.morphScreen = function morphScreen(h) { if (Number(h) > 200) { screenH = Number(h); render(); } };
-  window.morphState = function morphState() { return { open, mode: mode(), busy: busy && busy.action }; };
+  // For the lab: what the panel shows now (the same words a person reads).
+  window.morphState = function morphState() {
+    const src = spec.source || {};
+    return { open, mode: mode(), busy: busy && busy.action, visible: !!spec.visible, source: str(src.title, 80) + ' · ' + str(spec.sub || src.sub, 160), primary: spec.primary ? str(spec.primary.label, 40) : '', note: str(spec.note, 120), text: root.innerText.slice(0, 2000) };
+  };
   post({ type: 'ready' });
 })();

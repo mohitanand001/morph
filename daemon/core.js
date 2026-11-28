@@ -201,12 +201,15 @@ function createCore(io) {
   // from: the window that was in front when the copy happened (the helper notes it at that moment). Deciding from
   // the app in front *now* would read a password copied in a manager as soon as you switch to another app.
   // secret: the app marked the copy as secret.
-  function mayRead(from, secret) {
+  // hold (the Mac): 'ask' or 'deny' when the Mac would stop to ask before Morph reads a copy, so it is not read in the
+  // background; picking an app reads it (you asked).
+  function mayRead(from, secret, hold) {
     const w = from && (from.app || from.title) ? from : winNow;
     const pm = !!secret || (!!w && PASSWORD_APPS.test(String(w.app || '') + ' ' + String(w.title || '')));
     const rule = w === winNow ? currentRule : (w ? matchRule(activeRules(), w) : null);
-    if (!pm && (settings.readFrom === 'any' || rule)) return true;
-    lastSkip = { app: appLabel(w), pm };
+    const allowed = !pm && (settings.readFrom === 'any' || rule);
+    if (allowed && !hold) return true;
+    lastSkip = { app: appLabel(w), pm, hold: allowed ? String(hold) : '' };
     note('skipped', lastSkip.app, 0);
     clipStatus = 'Not read: copied from ' + lastSkip.app;
     original = null;
@@ -345,6 +348,14 @@ function createCore(io) {
       const recent = groups.slice(0, 4).map(readLine);
       spec.pane = { title: 'Privacy', lede: APP_NAME + ' never stores or sends what you copy.',
         actions: [{ icon: 'grid_view', label: 'Which apps ' + APP_NAME + ' reads from', sub: allApps() ? 'All apps, except password managers. Change it in Apps' : setupApps().filter((r) => r.enabled).length + ' apps. Change them in Apps', action: 'view:edit' }] };
+      // The Mac's own permissions, and where to change them.
+      const perm = MAC && io.permissions ? io.permissions() : null;
+      if (perm) {
+        const PASTE = { allow: 'Always allowed', ask: 'The Mac asks each time', deny: 'Not allowed', default: 'Not asked yet', none: 'No permission needed on this macOS' };
+        spec.pane.actions.push(
+          { icon: 'keyboard', label: 'Accessibility: ' + (perm.ax ? 'on' : 'off'), sub: perm.ax ? 'Lets ' + APP_NAME + ' see the window in front and press ' + PASTE_KEY + '. Change it in System Settings' : 'Turn it on so ' + APP_NAME + ' knows which tab you are in and can press ' + PASTE_KEY + '. Opens System Settings', trail: 'link', action: 'macperm:ax' },
+          { icon: 'content_paste', label: 'Reading copies: ' + (PASTE[perm.paste] || PASTE.none), sub: perm.paste === 'allow' || perm.paste === 'none' ? 'Paste from Other Apps, in System Settings' : 'To convert without the Mac asking: Paste from Other Apps → ' + APP_NAME + ' → Always Allow', trail: 'link', action: 'macperm:paste' });
+      }
       if (shellVersion >= 13) spec.pane.blocks = [
         { kind: 'panel', tone: 'plain', title: 'What ' + APP_NAME + ' read', items: recent.length ? recent : ['Nothing yet. Copies show up here, without their content.'] },
         { kind: 'panel', tone: 'plain', title: 'Never read', items: ['Password managers', 'Copies an app marks as secret'] }];
@@ -475,7 +486,7 @@ function createCore(io) {
       view: 'main',
       gear: 'view:settings',
       source: copy ? { icon: /table/i.test(copy.what || '') ? 'table' : 'content_paste', dest: place ? place.dest : '', title: place ? 'Copied from ' + place.tool : copy.image ? 'Table read from an image' : copy.from ? 'Copied from ' + copy.from : 'Copied', sub: [place ? place.where : '', copy.what].filter(Boolean).join(' · ') }
-        : skipped ? { icon: 'lock', title: 'Copied from ' + lastSkip.app, sub: lastSkip.pm ? 'Never read: a password manager' : 'Not read: ' + lastSkip.app + ' is off in Settings → Apps' }
+        : skipped ? { icon: 'lock', title: 'Copied from ' + lastSkip.app, sub: lastSkip.pm ? 'Never read: a password manager' : lastSkip.hold === 'ask' ? 'Not read yet: the Mac asks first. Pick an app' : lastSkip.hold === 'deny' ? 'Not read: the Mac does not allow it (Settings → Privacy)' : 'Not read: ' + lastSkip.app + ' is off in Settings → Apps' }
         : ocrBusy ? { icon: 'image', title: 'Reading the table…', sub: 'A few seconds' }
         : ocrImage ? { icon: 'image', title: 'Image copied', sub: ocrNote || 'Pick an app to read its table' }
         : imageOnly ? { icon: 'image', title: 'Image copied', sub: 'Nothing to convert. Paste it as it is.' }
@@ -491,6 +502,7 @@ function createCore(io) {
       note: helperHint && !MAC ? 'Run morph --install to update the GNOME helper' : updateInfo && !updating ? 'Version ' + updateInfo.version + ' is available · Settings → Updates' : '',
       edit: null,
     };
+    if (MAC && io.permissions && !spec.note && !io.permissions().ax) spec.note = 'Allow Accessibility to let ' + APP_NAME + ' press ' + PASTE_KEY + ' · Settings → Privacy';
     if (pillView !== 'main') return settingsSpec(spec, pillView);
     if (copy && rule && settings.autoFormat && autoDoneDest === rule.dest) spec.sub = (copy.what ? copy.what + ' · ' : '') + 'already fixed, just press ' + PASTE_KEY;
     // The app you are in gets its own row on top, so it is never missing from the list.
@@ -675,9 +687,11 @@ function createCore(io) {
       if (r.ok) {
         const shift = !!(winNow && TERMINAL_RE.test(winNow.app || ''));
         log('pasting into', r.name, shift ? '(Ctrl Shift V)' : '(Ctrl V)');
-        if (shellVersion >= 6) io.shell.paste(shift);
+        const pressed = shellVersion >= 6 ? io.shell.paste(shift) !== false : false;
         autoDoneDest = pendingDest;
-        flash = { done: '✓ Pasted into ' + r.name, sub: r.fromImage ? 'Read from an image: check the numbers.' : '', tone: 'ok', collapse: !r.fromImage };
+        // The Mac without Accessibility: Morph can't press ⌘V, so it says to press it.
+        if (!pressed && MAC) flash = { done: '✓ Ready to paste into ' + r.name, sub: 'Press ' + PASTE_KEY + '. To have Morph press it, allow Accessibility (Settings → Privacy).', tone: 'ok', collapse: false };
+        else flash = { done: '✓ Pasted into ' + r.name, sub: r.fromImage ? 'Read from an image: check the numbers.' : '', tone: 'ok', collapse: !r.fromImage };
       } else flash = { sub: r.note || (copySummary() ? 'Nothing to paste yet.' : ''), tone: 'warn', collapse: false };
       sendPill();
       return;
@@ -915,6 +929,7 @@ function createCore(io) {
     if (kind === 'ocr' && arg === 'folder' && io.ocr && io.ocr.dir) io.showInFolder(io.ocr.dir);
     if (kind === 'ocr' && /^(on|off|cancel|ask|askstop|askoff|no)$/.test(arg)) ocrAction(arg);
     if (kind === 'update') runUpdate();
+    if (kind === 'macperm' && /^(ax|paste)$/.test(arg) && io.openSettings) io.openSettings(arg);
     if (kind === 'checkupdate') checkNow();
     if (kind === 'uninstall') askUninstall(arg);
     const mv = kind === 'moved' && /^([lr])(\d)y(\d{1,4})$/.exec(arg);

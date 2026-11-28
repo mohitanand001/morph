@@ -132,6 +132,47 @@ const { mac, flush, SRC, SLACK, CHROME_GPT, ONEPW, JIRA, MD } = require('./mac-f
     check('Uninstall goes through the app after asking once', true);
   }
 
+
+  {
+    // macOS 15.4+: while the Mac would ask before every read, nothing is read in the background.
+    const m = mac();
+    m.access = 'ask';
+    await m.start();
+    m.copy(CHROME_GPT, MD);
+    await m.advance(400);
+    m.focus(SLACK);
+    await m.advance(1500);
+    check('while the Mac asks first, a copy is not read in the background', m.reads === 0 && m.writes.length === 0, m.reads + ' reads');
+    check('…and the card says to pick an app', /the Mac asks first/.test(JSON.stringify(m.panel().source)), JSON.stringify(m.panel().source));
+    check('…with the apps still clickable', (m.panel().options || []).flat().some((o) => o.action === 'fix:jira'), JSON.stringify(m.panel().options).slice(0, 200));
+    m.ctx.__morphAction('fix:jira');
+    await m.advance(300);
+    check('picking Jira reads it then (you asked) and converts it', m.reads === 1 && m.writes.length === 1 && /<strong>|<b>|<table/.test(m.writes[0].html), JSON.stringify(m.writes).slice(0, 200));
+    m.ctx.__morphAction('view:privacy');
+    await flush();
+    const pane = JSON.stringify(m.panel().pane);
+    check('Settings → Privacy shows the Mac permissions', /Accessibility: on/.test(pane) && /The Mac asks each time/.test(pane) && /Always Allow/.test(pane), pane.slice(0, 600));
+    m.ctx.__morphAction('macperm:paste');
+    m.ctx.__morphAction('macperm:ax');
+    m.ctx.__morphAction('macperm:evil');
+    check('its rows open the right System Settings pages', m.opened.join(',') === 'settings paste,settings ax', m.opened.join(','));
+  }
+
+  {
+    // Without Accessibility: no title, no ⌘V; Morph says so instead of claiming it pasted.
+    const m = mac({ files: { '/Users/t/Library/Application Support/Morph/settings.json': JSON.stringify({ setupDone: true }) } });
+    m.ax = false;
+    await m.start();
+    check('with Accessibility off, the card says how to turn it on', /Allow Accessibility/.test(m.panel().note || ''), m.panel().note);
+    m.copy(CHROME_GPT, MD);
+    await m.advance(400);
+    m.focus(SLACK);
+    await m.advance(800);
+    m.ctx.__morphHotkey('paste');
+    await m.advance(300);
+    check('the paste shortcut converts but does not pretend to press ⌘V', m.pastes === 0 && /Ready to paste into Slack/.test(JSON.stringify(m.panel().primary || m.panel())) && /Press ⌘V/.test(m.panel().sub || ''), JSON.stringify([m.panel().primary, m.panel().sub]));
+  }
+
   console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed (mac host)');
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.log('FAIL  crashed: ' + (e && e.stack)); process.exit(1); });

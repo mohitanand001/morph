@@ -2,6 +2,7 @@
 // JavaScriptCore. This file gives it `native`: the clipboard, the app in front, timers, files, the panel, and so on.
 // Everything is called on the main thread.
 import AppKit
+import ApplicationServices
 import JavaScriptCore
 
 final class Bridge {
@@ -84,6 +85,12 @@ final class Bridge {
         set("writeClip", writeClip)
         let paste: @convention(block) () -> Bool = { Keys.pasteCommandV() }
         set("paste", paste)
+        let axTrusted: @convention(block) () -> Bool = { AXIsProcessTrusted() }
+        set("axTrusted", axTrusted)
+        let pasteAccess: @convention(block) () -> String = { Permissions.pasteAccess() }
+        set("pasteAccess", pasteAccess)
+        let openSettings: @convention(block) (String) -> Void = { Permissions.open($0) }
+        set("openSettings", openSettings)
         let frontApp: @convention(block) () -> String = { Json.string(Front.now()) }
         set("frontApp", frontApp)
         let setHotkeys: @convention(block) (String) -> String = { j in
