@@ -18,8 +18,13 @@ On the first start the Mac asks once to let Morph use **Accessibility**: System 
 Accessibility → Morph. Morph needs it to see which window is in front (Jira or Google Docs in a browser) and to
 press ⌘V for you. Without it Morph still converts, but goes by the app alone and you press ⌘V yourself.
 
-On macOS 15.4 and newer, the Mac may also ask whether Morph may read what other apps copied ("Paste from Other
-Apps"). Choose Allow, or set it in System Settings → Privacy & Security → Paste from Other Apps.
+On macOS 15.4 and newer, the Mac may also ask before Morph reads what another app copied ("Paste from Other
+Apps"). While it would ask, Morph reads nothing in the background (that would mean an alert for every copy): the
+card says "Not read yet: the Mac asks first", and picking an app reads and converts it. To have Morph convert by
+itself again, set System Settings → Privacy & Security → Paste from Other Apps → Morph → Always Allow.
+
+Morph → Settings → Privacy shows both permissions, and each row opens its page in System Settings. With
+Accessibility off, the card says so, and the paste shortcut converts and asks you to press ⌘V.
 
 Morph opens at login (System Settings → General → Login Items to change that). Remove it from Morph's own
 Settings → Uninstall: it removes its login item and its own files by name, and moves Morph.app to the Bin.
@@ -54,11 +59,20 @@ What differs from Linux:
 - `node test/mac-panel.test.js`: the panel page in Chromium with specs from the real logic: every view fits,
   clicks send the right actions, nothing moves when you press a button, dragging moves the window. Screenshots in
   `test-results/mac-panel/`.
+- **The Mac lab** (`mac/lab/run.sh`, the `lab` job in `.github/workflows/mac.yml`): the real Morph on a CI Mac with
+  stand-in apps (`mac/lab/FakeApp.swift`: "Slack", a "Jira" browser tab, a chat app, KeePassXC, a plain editor)
+  that copy and paste through the real clipboard, with real key presses and mouse clicks (35 checks): window
+  titles, Convert automatically on switching apps, ⌘V, ⌃⌥V and ⌃⌥⇧V into the apps, password-manager and
+  concealed copies never read, RTF copies, a table read from a picture, opening the panel with the mouse,
+  clicking an app in it, typing still going to your app, Settings, a click elsewhere closing it, dragging the
+  tab, Hide Morph and ⌃⌥F, Save as PDF, and nothing copied in Morph's files. Then, for real, in temporary
+  folders: the installer (twice, and refusing a bad fingerprint), an update to a newer version (and refusing a bad
+  checksum), and uninstall (keeping a file that is not Morph's).
 - `.github/workflows/mac.yml`: builds the app on a real Mac and runs `Morph --selftest` (JavaScriptCore,
   clipboard formats, RTF copies, shortcuts, text recognition on a drawn table, the panel page in WebKit, PDF in
   pages). Results are annotations on the run, and the zip, results and a screenshot of the panel are its artifact.
   A `v<version>` tag, or "Run workflow" on the Actions page from main, publishes the zip as the release
   `v<version>`, which the installer and in-app updates download.
 
-Not checked by machine: Accessibility (window titles, ⌘V) and the pasteboard privacy prompt need a person to allow
-them, so they are tested by hand.
+Not checked by machine: the moment a person allows Accessibility, and the "Paste from Other Apps" alert (the CI Mac
+allows both from the start), real Slack/Jira/Outlook, several screens, and Intel Macs (CI is Apple silicon).

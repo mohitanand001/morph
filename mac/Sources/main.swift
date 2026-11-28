@@ -11,13 +11,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ note: Notification) {
         Log.url = paths.log
+        startWhenAlone(tries: 0)
+    }
+
+    /// One Morph at a time. Right after an update the old one is still quitting: wait a few seconds for it.
+    private func startWhenAlone(tries: Int) {
         let me = NSRunningApplication.current
-        if let id = Bundle.main.bundleIdentifier,
-           NSRunningApplication.runningApplications(withBundleIdentifier: id).contains(where: { $0 != me }) {
+        let others = Bundle.main.bundleIdentifier.map { id in NSRunningApplication.runningApplications(withBundleIdentifier: id).filter { $0 != me } } ?? []
+        if !others.isEmpty {
+            if tries < 30 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.startWhenAlone(tries: tries + 1) }; return }
             Log.write("[morph] already running")
             NSApp.terminate(nil)
             return
         }
+        start()
+    }
+
+    private func start() {
         try? FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         bridge = Bridge(paths: paths)
         panel = Panel()
@@ -47,11 +57,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// --lab-update <version> and --lab-uninstall: run the real update or uninstall on this copy of the app, for the lab
+/// (CI only: they refuse to run without MORPH_HOME, so they can never touch a person's own Morph settings).
+final class LabTask: NSObject, NSApplicationDelegate {
+    let what: String, arg: String
+    init(_ what: String, _ arg: String) { self.what = what; self.arg = arg }
+    func applicationDidFinishLaunching(_ n: Notification) {
+        guard ProcessInfo.processInfo.environment["MORPH_HOME"] != nil else { print("Needs MORPH_HOME."); exit(2) }
+        let paths = Paths.standard()
+        Log.url = paths.log
+        if what == "--lab-update" {
+            Updater.install(version: arg) { ok in print(ok ? "updated" : "update failed"); if !ok { exit(1) } }
+        } else {
+            print(Uninstaller.run(paths: paths) ? "uninstalled" : "uninstall failed")
+        }
+    }
+}
+
 let args = CommandLine.arguments
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 let appDelegate: NSApplicationDelegate
-if args.count >= 2 && args[1] == "--selftest" {
+if args.count >= 2 && (args[1] == "--lab-update" || args[1] == "--lab-uninstall") {
+    appDelegate = LabTask(args[1], args.count >= 3 ? args[2] : "")
+} else if args.count >= 2 && args[1] == "--lab" {
+    appDelegate = Lab(out: args.count >= 3 ? args[2] : "/dev/stdout")
+} else if args.count >= 2 && args[1] == "--selftest" {
     appDelegate = SelfTest(out: args.count >= 3 ? args[2] : "/dev/stdout")
 } else {
     appDelegate = AppDelegate()

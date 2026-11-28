@@ -15,6 +15,7 @@
   <key>LSUIElement</key><true/>
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
   <key>NSHumanReadableCopyright</key><string>Morph. Slack, Jira, Confluence and other names belong to their owners.</string>
 </dict>
 </plist>

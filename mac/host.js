@@ -79,7 +79,12 @@ function startMorphMac(native, opts) {
     },
     async writeClip(mime, data) { return mime === 'text/html' ? shell.writeBoth(data, '') : shell.writeBoth('', data); },
     // ⌘V in the app in front (terminals take ⌘V too, so "shift" means nothing here).
-    paste: () => { setTimeoutN(() => { if (!native.paste()) warn('paste: Morph is not allowed to press keys (Accessibility)'); }, 60); },
+    // false: Morph may not press keys (Accessibility is off), so the card asks you to press ⌘V.
+    paste: () => {
+      if (!native.axTrusted()) { warn('paste: Morph is not allowed to press keys (Accessibility)'); return false; }
+      setTimeoutN(() => { native.paste(); }, 60);
+      return true;
+    },
     async setShortcuts(list) {
       const r = parse(native.setHotkeys(JSON.stringify(Array.isArray(list) ? list : [])));
       return Array.isArray(r) ? r.map(String) : [];
@@ -153,6 +158,9 @@ function startMorphMac(native, opts) {
     openPath: (p) => native.openPath(String(p)),
     openUri: (u) => { if (/^(https?:|mailto:)/i.test(String(u))) native.openUrl(String(u)); },
     showInFolder: (p) => native.reveal(String(p)),
+    // The Mac's permissions: Accessibility (window titles, pressing ⌘V) and reading what other apps copied.
+    permissions: () => ({ ax: !!native.axTrusted(), paste: String(native.pasteAccess() || 'none') }),
+    openSettings: (what) => native.openSettings(String(what)),
     now: () => (native.now ? native.now() : Date.now()), // (tests give their own clock)
     setTimeout: setTimeoutN,
     clearTimeout: clearTimeoutN,
@@ -188,14 +196,26 @@ function startMorphMac(native, opts) {
     const n = native.changeCount();
     if (n === seen) return; // nothing new: nothing is read
     seen = n;
-    const types = (parse(native.clipTypes()) || []).map(String);
+    let types = (parse(native.clipTypes()) || []).map(String);
+    // An app clears the clipboard, then puts its copy there: a look in between finds nothing yet. Look again.
+    for (const wait of [120, 300, 700]) {
+      if (types.length || native.changeCount() !== n) break;
+      await sleep(wait);
+      types = (parse(native.clipTypes()) || []).map(String);
+    }
+    if (native.changeCount() !== n) { seen = -1; return; } // a newer copy came meanwhile: that one counts
+    lastRead = null; // read what is there now
     if (types.includes(OWN_TYPE)) { log('clipboard: Morph\'s own write'); return; }
     // The copy was made in the app in front just now (asked at once, before anything else can change it).
     const w = frontNow() || front;
     const from = w ? { app: w.app, title: w.title, name: w.name } : { app: '', title: '' };
     const secret = types.some((t) => SECRET_TYPES.test(t));
     // Privacy: decided by the app the copy was made in and by the copy's own marks, before anything is read.
-    if (!core.mayRead(from, secret)) { log('clipboard: not read (copied in', from.app || 'an unknown app', ')'); return; }
+    // macOS 15.4 and newer may ask you before an app reads what another app copied. While it would ask, nothing is
+    // read in the background (an alert for every copy); picking an app in Morph reads it.
+    const access = String(native.pasteAccess() || 'none');
+    const hold = access === 'ask' || access === 'deny' ? access : '';
+    if (!core.mayRead(from, secret, hold)) { log('clipboard: not read (copied in', from.app || 'an unknown app', ')'); return; }
     const sh = await shell.readClip();
     log('clipboard #' + n, sh ? (sh.secret ? 'secret' : sh.text.length + ' chars text, ' + sh.html.length + ' chars html') : 'unreadable');
     await core.clipboardChanged(sh && !sh.secret ? sh : (sh ? { secret: true } : null), from);

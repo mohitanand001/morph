@@ -126,7 +126,8 @@ enum Ocr {
 /// Downloads the Mac app for that version from the project's releases, checks its checksum and what it is,
 /// puts it in place of this copy (the old one goes to the Bin) and starts it.
 enum Updater {
-    static let repo = "https://github.com/mohitanand001/morph/releases/download/"
+    // (MORPH_RELEASES_URL: the lab's local copy of the releases, for testing the update.)
+    static let repo = ProcessInfo.processInfo.environment["MORPH_RELEASES_URL"] ?? "https://github.com/mohitanand001/morph/releases/download/"
 
     static func install(version v: String, done: @escaping (Bool) -> Void) {
         guard v.range(of: #"^\d+\.\d+\.\d+(-[a-z]+\.\d+)?$"#, options: .regularExpression) != nil,

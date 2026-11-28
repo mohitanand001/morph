@@ -17,12 +17,49 @@ enum Clip {
         let t = types()
         var html = pb.string(forType: .html) ?? ""
         if html.isEmpty, let rtf = pb.data(forType: .rtf) ?? pb.data(forType: .rtfd), rtf.count < 5_000_000,
-           let a = NSAttributedString(rtf: rtf, documentAttributes: nil) ?? NSAttributedString(rtfd: rtf, documentAttributes: nil),
-           let d = try? a.data(from: NSRange(location: 0, length: a.length), documentAttributes: [.documentType: NSAttributedString.DocumentType.html]) {
-            html = String(decoding: d, as: UTF8.self)
+           let a = NSAttributedString(rtf: rtf, documentAttributes: nil) ?? NSAttributedString(rtfd: rtf, documentAttributes: nil) {
+            html = Clip.html(from: a)
         }
         let text = pb.string(forType: .string) ?? ""
         return ["types": t, "text": String(text.prefix(2_000_000)), "html": String(html.prefix(5_000_000))]
+    }
+
+    /// Plain HTML from formatted text (what Notes, TextEdit and Pages copy): paragraphs, lists, bold, italic,
+    /// underline, strike-through, code and links. (The Mac's own HTML export puts formatting in CSS classes.)
+    static func html(from a: NSAttributedString) -> String {
+        let ns = a.string as NSString
+        let esc = { (t: String) -> String in t.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;") }
+        var out = ""
+        var list: String? = nil // "ul" or "ol" while inside a list
+        ns.enumerateSubstrings(in: NSRange(location: 0, length: ns.length), options: [.byParagraphs]) { _, range, _, _ in
+            var body = ""
+            a.enumerateAttributes(in: range, options: []) { attrs, r, _ in
+                var t = esc(ns.substring(with: r))
+                if let f = attrs[.font] as? NSFont {
+                    let tr = f.fontDescriptor.symbolicTraits
+                    if tr.contains(.monoSpace) { t = "<code>" + t + "</code>" }
+                    if tr.contains(.italic) { t = "<i>" + t + "</i>" }
+                    if tr.contains(.bold) { t = "<b>" + t + "</b>" }
+                }
+                if (attrs[.underlineStyle] as? Int ?? 0) != 0 && attrs[.link] == nil { t = "<u>" + t + "</u>" }
+                if (attrs[.strikethroughStyle] as? Int ?? 0) != 0 { t = "<s>" + t + "</s>" }
+                if let l = attrs[.link] { let u = (l as? URL)?.absoluteString ?? (l as? String) ?? ""; if !u.isEmpty { t = "<a href=\"" + esc(u) + "\">" + t + "</a>" } }
+                body += t
+            }
+            let style = range.length > 0 ? a.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle : nil
+            if let tl = style?.textLists.last {
+                let kind = tl.markerFormat.rawValue.contains("decimal") ? "ol" : "ul"
+                if list != kind { if let l = list { out += "</\(l)>" }; out += "<\(kind)>"; list = kind }
+                // The list marker is part of the text ("\t•\t"): leave it out.
+                if let m = body.range(of: #"^\t[^\t]*\t"#, options: .regularExpression) { body.removeSubrange(m) }
+                out += "<li>" + body + "</li>"
+            } else {
+                if let l = list { out += "</\(l)>"; list = nil }
+                if !body.trimmingCharacters(in: .whitespaces).isEmpty { out += "<p>" + body + "</p>" }
+            }
+        }
+        if let l = list { out += "</\(l)>" }
+        return out
     }
 
     /// Puts both versions on the clipboard: HTML (and RTF made from it, for Mac apps that prefer RTF) and plain text,
@@ -139,4 +176,37 @@ final class Hotkeys {
         "f1": kVK_F1, "f2": kVK_F2, "f3": kVK_F3, "f4": kVK_F4, "f5": kVK_F5, "f6": kVK_F6, "f7": kVK_F7, "f8": kVK_F8,
         "f9": kVK_F9, "f10": kVK_F10, "f11": kVK_F11, "f12": kVK_F12,
     ]
+}
+
+/// The Mac's permissions Morph needs, and where to change them.
+enum Permissions {
+    /// Reading what other apps copied (macOS 15.4 and newer may ask first): allow, ask, deny, default or none.
+    static func pasteAccess() -> String {
+        #if compiler(>=6.1)
+        if #available(macOS 15.4, *) {
+            switch NSPasteboard.general.accessBehavior {
+            case .alwaysAllow: return "allow"
+            case .ask: return "ask"
+            case .alwaysDeny: return "deny"
+            case .default: return "default"
+            @unknown default: return "default"
+            }
+        }
+        #endif
+        return "none"
+    }
+    /// Opens the right page of System Settings. For Accessibility, the Mac first adds Morph to the list and asks.
+    static func open(_ what: String) {
+        var url = "x-apple.systempreferences:com.apple.preference.security?Privacy"
+        if what == "ax" {
+            if !AXIsProcessTrusted() {
+                let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+                _ = AXIsProcessTrustedWithOptions(opts)
+            }
+            url = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        } else if what == "paste" {
+            url = "x-apple.systempreferences:com.apple.preference.security?Privacy_Pasteboard"
+        }
+        if let u = URL(string: url) { NSWorkspace.shared.open(u) }
+    }
 }

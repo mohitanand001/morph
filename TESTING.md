@@ -11,7 +11,8 @@ hand, so almost everything is checked by machine, in two layers:
 Run both before every release: `npm run test:all`.
 
 The Mac app has its own layer: `test/mac-host.test.js` and `test/mac-panel.test.js` run here with the fast tests, and
-`.github/workflows/mac.yml` builds the app on a real Mac and runs its self-test. See [mac/README.md](mac/README.md).
+`.github/workflows/mac.yml` builds the app on a real Mac, runs its self-test and the Mac lab (stand-in apps, real
+keys, mouse and clipboard; install, update, uninstall). See [mac/README.md](mac/README.md).
 
 ## Morph Lab
 

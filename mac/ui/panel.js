@@ -512,14 +512,20 @@
     hideTip();
     press = { x: e.screenX, y: e.screenY, tab: isTab, moved: false };
   }
+  // The last few mouse events (types and buttons only), for the lab when a click goes wrong.
+  const evlog = (window.__ev = []);
+  ['mousedown', 'mouseup', 'click', 'mousemove', 'mouseenter', 'mouseleave'].forEach((t) => window.addEventListener(t, (e) => { evlog.push(t + ':' + e.buttons); if (evlog.length > 30) evlog.shift(); }, true));
   window.addEventListener('mousemove', (e) => {
+    // A press whose release never arrived (the window can lose it): the button is up, so it ended.
+    if ((press || reorder) && e.buttons === 0) { finishPress(); return; }
     if (reorder) { reorderMove(e); return; }
     if (!press) return;
     if (!press.moved && Math.abs(e.screenX - press.x) + Math.abs(e.screenY - press.y) < 4) return;
     if (!press.moved) { press.moved = true; post({ type: 'drag', phase: 'start' }); }
     post({ type: 'drag', phase: 'move', dx: e.screenX - press.x, dy: e.screenY - press.y });
   });
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('mouseup', finishPress);
+  function finishPress() {
     if (reorder) { reorderEnd(); return; }
     const p = press;
     press = null;
@@ -527,7 +533,7 @@
     if (p.moved) post({ type: 'drag', phase: 'end' });
     if (!p.moved && p.tab && !open) setOpen(true);
     else if (pendingRender) render();
-  });
+  }
 
   // ---------------------------------------------------------------- open, close, idle
   function setOpen(v) {
@@ -586,7 +592,7 @@
     if (spec.settled) { busy = null; clearTimeout(busyTimer); }
     if (!(spec.setup && spec.setup.welcome)) welcomeDone = false;
     if (spec.openNow && !open) { open = true; send('opened:'); armIdle(); }
-    if (!spec.visible && open && !hovering && !spec.openNow) open = false;
+    if (!spec.visible && open && !spec.openNow) open = false; // Hide Morph: gone at once, even under the mouse
     if (press || reorder) { pendingRender = true; return; } // drawn when the press ends: never rebuilt under the mouse
     render();
     clearTimeout(collapseTimer);
@@ -594,6 +600,10 @@
   };
   window.morphClose = function morphClose() { if (open && !press && !reorder) setOpen(false); };
   window.morphScreen = function morphScreen(h) { if (Number(h) > 200) { screenH = Number(h); render(); } };
-  window.morphState = function morphState() { return { open, mode: mode(), busy: busy && busy.action }; };
+  // For the lab: what the panel shows now (the same words a person reads).
+  window.morphState = function morphState() {
+    const src = spec.source || {};
+    return { open, mode: mode(), busy: busy && busy.action, visible: !!spec.visible, source: str(src.title, 80) + ' · ' + str(spec.sub || src.sub, 160), primary: spec.primary ? str(spec.primary.label, 40) : '', note: str(spec.note, 120), text: root.innerText.slice(0, 2000) };
+  };
   post({ type: 'ready' });
 })();
