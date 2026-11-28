@@ -1,0 +1,77 @@
+name: mac
+on:
+  push:
+    branches: [main, 'mac-*']
+    tags: ['v*']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  # Builds Morph.app on a real Mac and runs its self-test (clipboard, text recognition, panel, PDF, shortcuts).
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - run: node test/mac-host.test.js
+      - name: build
+        run: |
+          set -o pipefail
+          bash mac/build.sh 2>&1 | tee "$RUNNER_TEMP/build.log" || {
+            # Compiler errors as annotations, so they can be read without opening the logs.
+            grep -E 'error:|warning: unre' "$RUNNER_TEMP/build.log" | head -40 | sed -E 's/%/%25/g; s/^/::error title=build::/'
+            exit 1
+          }
+      - name: self-test
+        run: |
+          mkdir -p "$RUNNER_TEMP/selftest"
+          export MORPH_HOME="$RUNNER_TEMP/morph-home"
+          mkdir -p "$MORPH_HOME"
+          set +e
+          mac/build/Morph.app/Contents/MacOS/Morph --selftest "$RUNNER_TEMP/selftest/results.json"
+          code=$?
+          set -e
+          # Each result as an annotation, so it can be read without opening the logs.
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+            for (const x of r.results) console.log((x.ok ? "::notice title=ok::" : "::error title=FAIL::") + x.name + (x.ok ? "" : " | " + String(x.detail).replace(/[\r\n%]/g, " ").slice(0, 300)));
+            console.log("::notice title=summary::" + r.passed + " passed, " + r.failed + " failed on macOS " + r.macOS);
+          ' "$RUNNER_TEMP/selftest/results.json" || echo "::error title=FAIL::the self-test wrote no results (exit $code)"
+          cp mac/build/Morph-mac.zip mac/build/Morph-mac.zip.sha256 "$RUNNER_TEMP/selftest/" || true
+          tail -n 60 "$MORPH_HOME/Logs/Morph.log" 2>/dev/null || true
+          exit $code
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: morph-mac
+          path: ${{ runner.temp }}/selftest
+
+  # A version tag (v0.15.0-rc.19) publishes the Mac app as a release download, for the installer and in-app updates.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - run: |
+          v=$(node -p "require('./package.json').version")
+          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME is not package.json $v"; exit 1; }
+      - run: bash mac/build.sh
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd mac/build
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" Morph-mac.zip Morph-mac.zip.sha256 --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" Morph-mac.zip Morph-mac.zip.sha256 --prerelease --title "Morph ${GITHUB_REF_NAME#v}" \
+              --notes "Morph for Mac (preview). Install: curl -fsSL https://mohitanand001.github.io/morph/install-mac.sh | bash"
+          fi

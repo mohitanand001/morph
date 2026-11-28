@@ -3,6 +3,8 @@
 # login autostart. Per-user setup (the GNOME helper) happens by itself at first login or from the app menu.
 # Usage: tools/build-deb.sh [absolute outdir]
 set -eu
+# A temporary build folder is emptied file by file, by name, then its empty folders (never a whole folder at once).
+clear_by_name() { [ -d "$1" ] || return 0; find "$1" \( -type f -o -type l \) -exec rm -f -- {} +; find "$1" -depth -type d -empty -exec rmdir -- {} +; }
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${1:-$SRC/dist}"
 VER="$(node -p "require('$SRC/package.json').version")"
@@ -65,5 +67,5 @@ chmod 755 "$P/usr/lib/morph/bin/morph"
 (cd "$P" && find usr etc -type f -exec md5sum {} + > DEBIAN/md5sums)
 rm -f "$OUT/morph_${DEBVER}_all.deb"
 dpkg-deb --root-owner-group --build "$P" "$OUT/morph_${DEBVER}_all.deb" >/dev/null
-rm -rf "$STAGE" "$ZTMP"
+clear_by_name "$STAGE"; clear_by_name "$ZTMP"
 echo "$OUT/morph_${DEBVER}_all.deb"

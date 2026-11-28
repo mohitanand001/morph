@@ -33,9 +33,9 @@ const KEY_IDS = ['paste', 'plain', 'pill', 'auto', 'pdf'];
 const APP_NAME = 'Morph';
 const TICK_MS = 1500;
 const PILL_PAGES = ['settings', 'size', 'keys', 'privacy', 'ocr', 'edit', 'updates', 'uninstall', 'about'];
-const TERMINAL_RE = /terminal|konsole|kitty|alacritty|wezterm|tilix|xterm|ghostty/i;
+const TERMINAL_RE = /terminal|konsole|kitty|alacritty|wezterm|tilix|xterm|ghostty|iterm|warp/i;
 // Apps that hold passwords: with "read from all apps", copies made in them are never read.
-const PASSWORD_APPS = /1password|bitwarden|vaultwarden|keepass|proton[ ._-]?pass|lastpass|dashlane|enpass|nordpass|keeper|roboform|authenticator|authy|seahorse|gnome-keyring|passwords|org\.gnome\.world\.secrets|\bsecrets\b|passbolt|buttercup|padloc|qtpass|gopass|keyguard/i;
+const PASSWORD_APPS = /keychainaccess|1password|bitwarden|vaultwarden|keepass|proton[ ._-]?pass|lastpass|dashlane|enpass|nordpass|keeper|roboform|authenticator|authy|seahorse|gnome-keyring|passwords|org\.gnome\.world\.secrets|\bsecrets\b|passbolt|buttercup|padloc|qtpass|gopass|keyguard/i;
 const SECRET_FORMATS = /x-kde-passwordmanagerhint|concealedtype|org\.nspasteboard\.(concealed|transient)|clipboard-history-exclude/i;
 
 function cleanDests(list) {
@@ -67,6 +67,11 @@ const PDF_MAX_CHARS = 300000; // a PDF is made from what you copied; refuse absu
 const norm = (t) => String(t == null ? '' : t).replace(/\r\n/g, '\n').replace(/\s+$/g, '');
 
 function createCore(io) {
+  // The Mac app runs this same core in JavaScriptCore. Where the two desktops differ (wording, key symbols, how the
+  // clipboard is written), this says which one it is.
+  const MAC = io.platform === 'mac';
+  const PASTE_KEY = MAC ? '⌘V' : 'Ctrl V';
+  const keyLabel = (accel) => accelLabel(accel, MAC);
   const FB = globalThis.FB;
   const log = io.log || (() => {});
   const SETTINGS_DEFAULT = { rules: DEFAULT_RULES, pillEnabled: true, pillMode: 'always', pillYFrac: 0.42, pillSide: 'r', pillMonitor: -1, autoFormat: true, linkBack: false, crossLinks: true, tabIcons: false, theme: 'sol-light', size: 'm', shortcuts: null, pillDests: null, seenDefaults: null, people: {}, updateCheck: true, readFrom: 'any', setupDone: false, appOrder: null, lastCheck: 0, lastOk: 0, notifiedVersion: '' };
@@ -183,6 +188,7 @@ function createCore(io) {
     if (!w) return 'another app';
     const r = matchRule(settings.rules.map((x) => Object.assign({}, x, { enabled: true })), w);
     if (r) return r.name;
+    if (w.name) return String(w.name).slice(0, 30); // the Mac gives the app's own name
     const id = String(w.app || '').replace(/\.desktop$/, '').replace(/^(org|com|io|net)\.[^.]+\./, '').replace(/[-_](server|bin|app)$/i, '').replace(/[-_.]+/g, ' ').trim();
     return id ? (id.charAt(0).toUpperCase() + id.slice(1)).slice(0, 30) : 'another app';
   };
@@ -227,7 +233,7 @@ function createCore(io) {
     }
     if (ocrReady()) {
       if (ocrAsk === 'off' && ocrCanManage()) return ask('Remove image tables?', 'This deletes its files (' + OCR_SIZE + '). Morph keeps working without it.', 'Remove', 'ocr:off', 'Keep it');
-      return [{ kind: 'panel', tone: 'ok', icon: 'check_circle', title: 'Image tables are on', text: 'A copied image is read only when you pick an app, on this computer. Nothing is uploaded.' },
+      return [{ kind: 'panel', tone: 'ok', icon: 'check_circle', title: 'Image tables are on', text: (io.ocr.builtin ? 'Uses the Mac\'s own text recognition. ' : '') + 'A copied image is read only when you pick an app, on this computer. Nothing is uploaded.' },
         ...(ocrCanManage() ? [{ kind: 'buttons', buttons: [{ label: 'Remove image tables', action: 'ocr:askoff', kind: 'secondary' }] }] : [])];
     }
     if (ocrAsk === 'on' && ocrCanManage()) return ask('Download ' + OCR_SIZE + '?', 'This downloads RapidOCR once, from PyPI and its models from ModelScope (the RapidOCR project\'s model host). Images are read only on this computer, offline, and only when you pick an app.', 'Install', 'ocr:on', 'Not now');
@@ -297,7 +303,7 @@ function createCore(io) {
   }
   const visibleKeys = () => settings.shortcuts.filter((k) => KEY_IDS.includes(k.id));
   function shortcutsForSettings() {
-    return visibleKeys().map((k) => ({ id: k.id, name: (SHORTCUTS.find((x) => x.id === k.id) || {}).name || k.id, accel: k.accel, label: accelLabel(k.accel, false), on: k.on, taken: keysFailed.includes(k.id) }));
+    return visibleKeys().map((k) => ({ id: k.id, name: (SHORTCUTS.find((x) => x.id === k.id) || {}).name || k.id, accel: k.accel, label: keyLabel(k.accel), on: k.on, taken: keysFailed.includes(k.id) }));
   }
 
   function settingsSpec(base, page) {
@@ -360,7 +366,7 @@ function createCore(io) {
       let st;
       if (checking) st = { tone: 'plain', icon: 'refresh', title: 'Checking for updates…', text: 'Looking at the Morph website.', button: { label: 'Checking…', action: 'checkupdate:', disabled: true, kind: 'secondary' } };
       else if (updating) st = { tone: 'warn', icon: 'download', title: 'Updating…', text: 'Morph restarts when it is done.', button: { label: 'Updating…', action: 'update:', disabled: true, kind: 'primary' } };
-      else if (updateFailed) st = { tone: 'warn', icon: 'error', title: 'The update did not finish', text: 'Try again, or run morph --update.', button: { label: 'Try again', action: 'update:', kind: 'primary' } };
+      else if (updateFailed) st = { tone: 'warn', icon: 'error', title: 'The update did not finish', text: MAC ? 'Try again, or download Morph again from the website.' : 'Try again, or run morph --update.', button: { label: 'Try again', action: 'update:', kind: 'primary' } };
       else if (checkFailed) st = { tone: 'warn', icon: 'error', title: 'Could not check for updates', text: 'Check your connection and try again.', button: { label: 'Retry', action: 'checkupdate:', kind: 'primary' } };
       else if (updateInfo) st = { tone: 'warn', icon: 'download', title: 'Version ' + updateInfo.version + ' is available', text: 'Updating installs it and restarts Morph.', button: { label: 'Update now', action: 'update:', kind: 'primary' } };
       else st = { tone: 'ok', icon: 'check_circle', title: 'You are up to date', text: 'This is the latest version of Morph.', button: { label: 'Check for updates', action: 'checkupdate:', kind: 'secondary' } };
@@ -368,17 +374,15 @@ function createCore(io) {
         blocks: [Object.assign({ kind: 'status', items: meta }, st)],
         opts: [{ icon: 'schedule', label: 'Check automatically', sub: 'Looks at the Morph website once a day', sw: sw(settings.updateCheck), action: 'toggle:updates' }] };
     } else if (cur === 'uninstall' && shellVersion >= 13) {
-      const ocrIn = ocrReady() || ocrLegacy() || ocrJob;
+      const ocrIn = !(io.ocr && io.ocr.builtin) && (ocrReady() || ocrLegacy() || ocrJob); // the Mac's text recognition is part of the Mac
       spec.pane = { title: 'Uninstall Morph', lede: 'Removes Morph from this computer, for your account. You can install it again at any time.',
         blocks: [
-          ...(uninstallFailed ? [{ kind: 'panel', tone: 'warn', icon: 'error', title: 'Uninstall did not finish', text: 'Run morph --uninstall in a terminal instead.' }] : []),
+          ...(uninstallFailed ? [{ kind: 'panel', tone: 'warn', icon: 'error', title: 'Uninstall did not finish', text: MAC ? 'Quit Morph and move Morph.app from Applications to the Bin instead.' : 'Run morph --uninstall in a terminal instead.' }] : []),
           { kind: 'panel', tone: 'plain', title: 'What is removed', items: [
             'The Morph program and its folder',
             'Your Morph settings: chosen apps, order, size and shortcuts',
             'Morph log files',
-            'Start at login',
-            'The tab on the screen edge (its GNOME helper)',
-            'The morph command',
+            ...(MAC ? ['Open at login', 'The Morph app in Applications'] : ['Start at login', 'The tab on the screen edge (its GNOME helper)', 'The morph command']),
             ...(ocrIn ? ['Image tables: RapidOCR and its models in Morph\'s own folder'] : []) ] },
           { kind: 'text', text: 'Your documents and files are not touched, and nothing you copied was ever stored.' + (ocrIn ? ' An OCR package you installed yourself, outside Morph, is not touched either.' : '') },
           // The question takes the place of the buttons: nothing above it moves.
@@ -398,8 +402,8 @@ function createCore(io) {
       spec.pane = { title: 'Uninstall', lede: 'Remove Morph from this account.',
         actions: io.uninstall ? [{ icon: 'delete', label: 'Uninstall Morph', sub: 'Removes it, its settings and its files', action: 'uninstall:', confirm: { title: 'Uninstall Morph?', body: 'This removes Morph, its settings and its files from this account. You can install it again later.', ok: 'Uninstall' } }] : [] };
     } else if (cur === 'about') {
-      spec.pane = { title: 'About', lede: APP_NAME + ' for Linux.',
-        about: { name: APP_NAME, version: 'Version ' + io.version + ' · GNOME',
+      spec.pane = { title: 'About', lede: APP_NAME + (MAC ? ' for Mac.' : ' for Linux.'),
+        about: { name: APP_NAME, version: 'Version ' + io.version + (MAC ? ' · macOS' : ' · GNOME'),
           text: 'Copy something formatted in one app, and ' + APP_NAME + ' re-shapes it for wherever you paste next. Nothing you copy leaves your computer.',
           legal: 'Slack, Jira, Confluence, Google Docs, Notion, Linear and other names and logos belong to their owners and only show which app a format is for. ' + APP_NAME + ' is not affiliated with or endorsed by them.' } };
     } else {
@@ -413,7 +417,7 @@ function createCore(io) {
       const SUB = { s: 'Compact', m: 'Default', l: 'Roomy' };
       spec.pane.cardsTitle = 'Size';
       spec.pane.cards = ['s', 'm', 'l'].map((z) => ({ label: SIZE_NAMES[z], sub: SUB[z], size: z, on: settings.size === z, action: 'size:' + z }));
-      spec.pane.tail = [{ icon: 'power_settings_new', label: 'Hide ' + APP_NAME, sub: 'Until you press ' + (pk && pk.on ? accelLabel(pk.accel, false) : 'morph --restart') + ' or log in again', action: 'hide:' }];
+      spec.pane.tail = [{ icon: 'power_settings_new', label: 'Hide ' + APP_NAME, sub: 'Until you press ' + (pk && pk.on ? keyLabel(pk.accel) : MAC ? 'open Morph again' : 'morph --restart') + (MAC ? '' : ' or log in again'), action: 'hide:' }];
       if (shellVersion < 12) {
         // An older helper only draws switches: keep the old two-click rows until it is updated.
         spec.pane.opts.push({ icon: 'download', label: 'Check for updates daily', sub: 'Looks at the Morph website once a day', sw: sw(settings.updateCheck), action: 'toggle:updates' });
@@ -484,11 +488,11 @@ function createCore(io) {
       original: null,
       collapseAfterMs: 0,
       // A standing note under the card: an update to install, or a helper to refresh.
-      note: helperHint ? 'Run morph --install to update the GNOME helper' : updateInfo && !updating ? 'Version ' + updateInfo.version + ' is available · Settings → Updates' : '',
+      note: helperHint && !MAC ? 'Run morph --install to update the GNOME helper' : updateInfo && !updating ? 'Version ' + updateInfo.version + ' is available · Settings → Updates' : '',
       edit: null,
     };
     if (pillView !== 'main') return settingsSpec(spec, pillView);
-    if (copy && rule && settings.autoFormat && autoDoneDest === rule.dest) spec.sub = (copy.what ? copy.what + ' · ' : '') + 'already fixed, just press Ctrl V';
+    if (copy && rule && settings.autoFormat && autoDoneDest === rule.dest) spec.sub = (copy.what ? copy.what + ' · ' : '') + 'already fixed, just press ' + PASTE_KEY;
     // The app you are in gets its own row on top, so it is never missing from the list.
     if (rule && offered.includes(rule.dest)) spec.primary = Object.assign(optRow(rule.dest), { label: rule.name, hint: 'This app' }, tickDest === rule.dest ? {} : { busy: rule.name + '…' });
     spec.section = rule ? 'Copy for another app' : 'Copy it for';
@@ -651,6 +655,8 @@ function createCore(io) {
     ownText = text;
     ownHtml = html || null;
     ownWriteUntil = io.now() + 1500; // our own write is not "a new copy"
+    // The Mac clipboard holds both: the formatted version and plain text, so every app gets one it can paste.
+    if (io.shell.writeBoth) return io.shell.writeBoth(html || '', text || '');
     // GNOME's clipboard takes one format at a time: the rich one when there is one.
     const ok = html ? await io.shell.writeClip('text/html', html) : await io.shell.writeClip('text/plain', text);
     if (!ok && html) return io.shell.writeClip('text/plain', text);
@@ -921,7 +927,7 @@ function createCore(io) {
   }
   function hidePill() {
     const keys = settings.shortcuts.find((k) => k.id === 'pill');
-    const how = keys && keys.on ? accelLabel(keys.accel, false) : 'morph --restart';
+    const how = keys && keys.on ? keyLabel(keys.accel) : MAC ? 'opening Morph again' : 'morph --restart';
     pillView = 'main'; // the message shows on the main card
     flash = { sub: 'Hiding. Bring it back with ' + how + '.', tone: 'ok', open: true };
     sendPill();

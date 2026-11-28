@@ -15,14 +15,25 @@ TMP="$(mktemp -d)"
 bash "$SRC/tools/build-linux-zip.sh" "$TMP" >/dev/null
 bash "$SRC/tools/build-deb.sh" "$TMP" >/dev/null
 node "$SRC/tools/build-demo.js" "$TMP/try.html" >/dev/null
-rm -rf "$DOCS"; mkdir -p "$DOCS"
+# The old site goes file by file, by name (never a whole folder at once).
+if [ -d "$DOCS" ]; then
+  for f in "$DOCS"/morph-*-linux.zip "$DOCS"/morph_*_all.deb "$DOCS/version.json" "$DOCS/try.html" "$DOCS/install.sh" "$DOCS/install-mac.sh" "$DOCS/index.html" "$DOCS/.nojekyll"; do
+    if [ -f "$f" ]; then rm -f -- "$f"; fi
+  done
+  for f in "$SRC"/site/fonts/*; do rm -f -- "$DOCS/fonts/$(basename "$f")"; done
+  rmdir -- "$DOCS/fonts" 2>/dev/null || true
+fi
+mkdir -p "$DOCS"
 cp "$TMP/morph-$VER-linux.zip" "$TMP/version.json" "$TMP/try.html" "$DOCS/"
 # The .deb is published under a plain name (no ~), which every browser and server handles.
 cp "$TMP/morph_${DEBVER}_all.deb" "$DOCS/morph_${VER}_all.deb"
 cp "$SRC/site/install.sh" "$DOCS/install.sh"
+cp "$SRC/site/install-mac.sh" "$DOCS/install-mac.sh"
 # Fonts are served from the site itself: a visit sends nothing to a font service.
-cp -r "$SRC/site/fonts" "$DOCS/fonts"
+mkdir -p "$DOCS/fonts"
+cp "$SRC"/site/fonts/* "$DOCS/fonts/"
 sed -e "s/VERSION/$VER/g" -e "s/DEBFILE/morph_${VER}_all.deb/g" "$SRC/site/index.html" > "$DOCS/index.html"
 touch "$DOCS/.nojekyll"
-rm -rf "$TMP"
+rm -f -- "$TMP/morph-$VER-linux.zip" "$TMP/version.json" "$TMP/try.html" "$TMP/morph_${DEBVER}_all.deb"
+rmdir -- "$TMP" 2>/dev/null || echo "note: $TMP kept (it holds files this script did not make)"
 echo "docs/ ready: version $VER"

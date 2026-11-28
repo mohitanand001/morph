@@ -110,7 +110,7 @@ function unpackMorph(dest) {
   const kills = sh.split('\n').filter((l) => /\b(pkill|killall|kill)\b/.test(l) && !/^\s*#/.test(l));
   check('the only processes stopped are Morph\'s own', kills.length > 0 && kills.every((l) => /pkill -f "gjs\.\*\$MAIN"/.test(l)), kills.join(' | '));
   const rms = sh.split('\n').filter((l) => /\brm -r?f\b/.test(l) && !/^\s*#/.test(l));
-  check('nothing deletes a folder with what is inside it: no rm -r anywhere that runs on your computer', ['bin/morph', 'site/install.sh', 'daemon/gjs-main.js', 'gnome-extension/morph-focus@morph.dev/extension.js'].every((f) => !/\brm\s+-[a-zA-Z]*r/.test(fs.readFileSync(path.join(SRC, f), 'utf8'))) && !/rm -r/.test(fs.readFileSync(path.join(SRC, 'tools/build-deb.sh'), 'utf8').split('DEBIAN/prerm')[1].split('chmod')[0]));
+  check('nothing deletes a folder with what is inside it: no rm -r anywhere that runs on your computer', ['bin/morph', 'site/install.sh', 'site/install-mac.sh', 'mac/build.sh', 'tools/build-site.sh', 'tools/build-linux-zip.sh', 'tools/build-deb.sh', 'daemon/gjs-main.js', 'gnome-extension/morph-focus@morph.dev/extension.js'].every((f) => !/\brm\s+-[a-zA-Z]*r/.test(fs.readFileSync(path.join(SRC, f), 'utf8'))) && !/rm -r/.test(fs.readFileSync(path.join(SRC, 'tools/build-deb.sh'), 'utf8').split('DEBIAN/prerm')[1].split('chmod')[0]));
   check('the update only accepts a Morph zip from the same website', /\^morph-\[0-9A-Za-z\.\+-\]\+-linux\\\\?\.zip\$/.test(sh) && !/case "\$zip" in http/.test(sh));
 }
 

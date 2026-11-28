@@ -33,7 +33,7 @@ function makeRequire(dir) {
 // The converter: plain scripts that fill in window.FB. The same files the tests run.
 // GJS already defines window (read-only); only add it if some version doesn't.
 if (typeof globalThis.window === 'undefined') Object.defineProperty(globalThis, 'window', { value: globalThis, configurable: true });
-const CORE = ['ast-utils', 'lift', 'lists', 'people', 'terminal', 'pdf', 'detect', 'minidom', 'normalize-html', 'normalize-markdown', 'normalize-mrkdwn', 'render-slack', 'render-slack-html', 'render-jira', 'render-github', 'render-gdocs', 'render-email', 'render-text', 'fidelity', 'engine'];
+const CORE = ['ast-utils', 'lift', 'lists', 'people', 'terminal', 'pdf', 'detect', 'minidom', 'normalize-html', 'normalize-markdown', 'normalize-mrkdwn', 'render-slack', 'render-slack-html', 'render-jira', 'render-github', 'render-gdocs', 'render-email', 'render-text', 'fidelity', 'engine', 'ocr-grid'];
 CORE.forEach((f) => new Function(readText(root.get_child('src').get_child('core').get_child(f + '.js').get_path()))());
 const req = makeRequire(here.get_path());
 const { createCore } = req('./core.js');

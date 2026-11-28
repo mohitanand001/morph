@@ -2,6 +2,8 @@
 # Builds the small Linux download: the background program, the converter, the GNOME helper and the
 # installer. No Node, no Electron. Usage: tools/build-linux-zip.sh [outdir]
 set -eu
+# A temporary build folder is emptied file by file, by name, then its empty folders (never a whole folder at once).
+clear_by_name() { [ -d "$1" ] || return 0; find "$1" \( -type f -o -type l \) -exec rm -f -- {} +; find "$1" -depth -type d -empty -exec rmdir -- {} +; }
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${1:-$SRC/dist}"
 VER="$(node -p "require('$SRC/package.json').version")"
@@ -31,7 +33,7 @@ chmod +x "$DIR/bin/morph"
 (cd "$DIR" && { find . -type f ! -name MANIFEST | sed 's#^\./##' | LC_ALL=C sort; echo MANIFEST; }) > "$DIR/MANIFEST"
 rm -f "$OUT/morph-$VER-linux.zip"
 (cd "$STAGE" && zip -qr "$OUT/morph-$VER-linux.zip" morph)
-rm -rf "$STAGE"
+clear_by_name "$STAGE"
 # What the app and the installer ask the website for: newest version, file, fingerprint.
 SHA="$(sha256sum "$OUT/morph-$VER-linux.zip" | cut -d' ' -f1)"
 printf '{\n  "version": "%s",\n  "zip": "morph-%s-linux.zip",\n  "sha256": "%s"\n}\n' "$VER" "$VER" "$SHA" > "$OUT/version.json"
