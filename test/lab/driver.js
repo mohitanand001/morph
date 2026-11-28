@@ -28,7 +28,9 @@
         const [x, y] = a.get_transformed_position();
         const [w, h] = a.get_transformed_size();
         const cls = a.get_style_class_name ? (a.get_style_class_name() || '') : '';
-        const text = a instanceof St.Label ? a.text : '';
+        // St.Label holds its text; a button made with a label draws it with a bare Clutter.Text.
+        const par = a.get_parent();
+        const text = a instanceof St.Label ? a.text : (a instanceof Clutter.Text && !(par instanceof St.Label) ? a.text : '');
         out.push({ path, cls, text, name: a.accessible_name || '', box: [Math.round(x), Math.round(y), Math.round(w), Math.round(h)], reactive: a.reactive, button: a instanceof St.Button, focus: a === focus, shown, opacity: a.opacity, style: a.get_style ? (a.get_style() || '') : '' });
         a.get_children().forEach((c, i) => walk(c, path + '/' + i, shown));
       };
@@ -62,7 +64,7 @@
       const roots = [p._root, p._setupDlg].filter(Boolean);
       const walk = (a) => {
         if (!a.visible || a.opacity === 0) return;
-        if ((a instanceof St.Label && a.text === text) || (a.accessible_name === text && a.reactive)) {
+        if ((a instanceof St.Label && a.text === text) || (a instanceof St.Button && a.label === text) || (a.accessible_name === text && a.reactive)) {
           let b = a;
           while (b && !(b instanceof St.Button) && !b.reactive) b = b.get_parent();
           if (b) hits.push(b);

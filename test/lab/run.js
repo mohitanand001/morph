@@ -38,9 +38,11 @@ if (!process.env.MORPH_LAB_INNER) {
   // is told there is no systemd seat (a private mount over /run/systemd, for this run only).
   const ping = (bus, dest) => spawnSync('gdbus', ['call', bus, '--dest', dest, '--object-path', '/', '--method', 'org.freedesktop.DBus.Peer.Ping'], { timeout: 3000 }).status === 0;
   const isRoot = process.getuid && process.getuid() === 0;
-  if (!fs.existsSync('/run/dbus/system_bus_socket')) {
-    if (!isRoot) { console.error('Morph Lab needs a system D-Bus (it is missing here). Run it as root in a container, or on a normal desktop/CI machine.'); process.exit(2); }
+  if (!ping('--system', 'org.freedesktop.DBus')) {
+    if (!isRoot) { console.error('Morph Lab needs a system D-Bus (it is not answering here). Run it as root in a container, or on a normal desktop/CI machine.'); process.exit(2); }
     fs.mkdirSync('/run/dbus', { recursive: true });
+    // A container that restarted can leave the old bus's socket and pid file behind: those two files, by name.
+    for (const f of ['/run/dbus/system_bus_socket', '/run/dbus/pid']) { try { fs.unlinkSync(f); } catch (e) { /* none */ } }
     spawnSync('dbus-daemon', ['--system', '--fork']);
   }
   const noLogind = fs.existsSync('/run/systemd/seats') && !ping('--system', 'org.freedesktop.login1');
@@ -86,7 +88,7 @@ const chosen = scenarios.filter((s) => !filter || s.name.toLowerCase().includes(
     let error = '';
     const s0 = Date.now();
     try {
-      await lab.reset({ settings: s.settings === undefined ? {} : s.settings });
+      await lab.reset({ settings: s.settings === undefined ? {} : s.settings, trace: !!s.trace });
       await s.run(lab, t);
     } catch (e) {
       error = e.message || String(e);

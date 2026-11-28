@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Loads nothing from other sites, runs no outside script, sends no form anywhere. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Morph</title>
 <meta name="description" content="Morph re-shapes what you copy for the app you paste into: tables stay tables, lists stay lists. For GNOME on Linux. Your clipboard stays on your computer.">
@@ -102,7 +104,7 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
     <a class="dl" href="try.html">Try it in your browser<small>copy a sample, pick an app, see what pastes</small></a>
     <a class="ghost" href="https://github.com/mohitanand001/morph">Source on GitHub</a>
   </div>
-  <div class="chips"><span class="chip">Version 0.15.0-rc.17 · testing</span><span class="chip">Linux · GNOME</span><span class="chip">Source available</span></div>
+  <div class="chips"><span class="chip">Version 0.15.0-rc.18 · testing</span><span class="chip">Linux · GNOME</span><span class="chip">Source available</span></div>
 </header>
 
 <nav aria-label="Sections"><div class="in"><a href="try.html">Try it</a><a href="#install">Install</a><a href="#use">Use</a><a href="#privacy">Privacy</a><a href="#ocr">Image tables</a><a href="#update">Update</a><a href="#uninstall">Uninstall</a><a href="#help">Troubleshooting</a></div></nav>
@@ -131,7 +133,7 @@ kbd{font:700 .85em var(--mono);background:var(--paper);border:1px solid var(--li
 
   <div class="step"><div class="n">3</div><div class="body">
     <h3>Prefer a package?</h3>
-    <p>A <a href="morph_0.15.0-rc.17_all.deb">.deb for Debian and Ubuntu</a> installs the same thing system-wide. Install it with <code>sudo apt install ./morph_0.15.0-rc.17_all.deb</code>, then open Morph from the app menu. Updates come from a newer .deb.</p>
+    <p>A <a href="morph_0.15.0-rc.18_all.deb">.deb for Debian and Ubuntu</a> installs the same thing system-wide. Install it with <code>sudo apt install ./morph_0.15.0-rc.18_all.deb</code>, then open Morph from the app menu. Updates come from a newer .deb.</p>
   </div></div>
 </section>
 

@@ -125,7 +125,8 @@ class Lab {
   }
 
   // ---- Morph's background program, fresh for every scenario
-  async reset({ settings } = {}) {
+  // trace: run Morph's program under strace, recording every network connection it (or a child) opens.
+  async reset({ settings, trace } = {}) {
     if (this.shell && this.shell.exitCode !== null) {
       // GNOME Shell stopped (it can, in a headless test session): start a fresh one so one crash doesn't fail every
       // scenario after it. The report says so.
@@ -144,7 +145,10 @@ class Lab {
     if (settings === null) { try { fs.unlinkSync(file); } catch (e) { /* none */ } }
     else fs.writeFileSync(file, JSON.stringify(Object.assign({ setupDone: true }, settings || {})));
     this.daemonLog = fs.openSync(path.join(this.dir, 'morph-daemon.log'), 'a');
-    this.daemon = spawn('gjs', ['-m', path.join(ROOT, 'daemon', 'gjs-main.js')], { env: Object.assign({}, this.env, { FB_DEBUG: '1' }), stdio: ['ignore', this.daemonLog, this.daemonLog] });
+    const main = ['gjs', '-m', path.join(ROOT, 'daemon', 'gjs-main.js')];
+    this.traceFile = trace ? path.join(this.dir, 'network-trace.txt') : '';
+    const cmd = trace ? ['strace', '-f', '-qq', '-e', 'trace=connect,execve', '-s', '300', '-o', this.traceFile, ...main] : main;
+    this.daemon = spawn(cmd[0], cmd.slice(1), { env: Object.assign({}, this.env, { FB_DEBUG: '1' }), stdio: ['ignore', this.daemonLog, this.daemonLog] });
     await this.waitFor('Morph\'s helper to accept Morph\'s program', async () => (await this.lab('state()')).peer, 15000);
     await this.waitFor('the tab (or the welcome card) to show', async () => { const st = await this.lab('state()'); return st.visible || st.setup; }, 15000);
     await this.settle();
@@ -223,6 +227,23 @@ class Lab {
     if (!label) return null;
     const owners = tr.filter((n) => n.button && (label.path === n.path || label.path.startsWith(n.path + '/')));
     return owners.length ? owners[owners.length - 1].path : label.path;
+  }
+
+  // Every connection Morph's program opened that left the computer (anything but local sockets), from strace.
+  networkConnections() {
+    if (!this.traceFile) return null;
+    let t = '';
+    try { t = fs.readFileSync(this.traceFile, 'utf8'); } catch (e) { return []; }
+    return t.split('\n').filter((l) => /connect\(/.test(l) && /AF_INET6?/.test(l) && !/127\.0\.0\.1|::1|inet_addr\("0\.0\.0\.0"\)/.test(l));
+  }
+  // Every file under the lab's home folder (where Morph keeps settings, caches and logs) and its private runtime
+  // folder, with its content, so a scenario can search all of it.
+  filesWritten() {
+    const out = [];
+    const walk = (d) => { let es = []; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch (e) { return; }
+      for (const e of es) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.isFile()) { let c = ''; try { c = fs.readFileSync(p).toString('latin1'); } catch (x) { /* unreadable */ } out.push({ path: p, mode: (fs.statSync(p).mode & 0o777).toString(8), content: c }); } } };
+    walk(this.home);
+    return out;
   }
 
   // ---- the record

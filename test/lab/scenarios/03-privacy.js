@@ -81,4 +81,14 @@ module.exports = [
       t.check('a listener sees no Changed signal with titles', !/Changed|notes\.txt|general - Slack/.test(seen), seen.slice(0, 300));
     },
   },
+  {
+    name: 'Morph\'s own program offers nothing on the session bus',
+    run: async (lab, t) => {
+      const r = await lab.call('dev.morph.Daemon', '/', 'org.freedesktop.DBus.Introspectable', 'Introspect', '', [], 's');
+      const xml = r.ok ? r.result[0] : '';
+      const ifaces = [...xml.matchAll(/<interface name="([^"]+)"/g)].map((m) => m[1]).filter((n) => !/^org\.freedesktop\.DBus\./.test(n));
+      const nodes = [...xml.matchAll(/<node name="([^"]+)"/g)].map((m) => m[1]);
+      t.check('no methods or objects of its own (it only holds its name, to run once)', r.ok && !ifaces.length && !nodes.length, xml.slice(0, 300) || r.error);
+    },
+  },
 ];

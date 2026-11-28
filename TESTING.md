@@ -44,10 +44,11 @@ private mount.
 |---|---|
 | `01-smoke.js` | the tab shows and the panel opens |
 | `02-convert.js` | Google Docs table → Jira and Undo; Markdown → Slack; Convert automatically on app switch; converted text into a plain-text app |
-| `03-privacy.js` | password manager copies are never read (also after switching apps and waiting); a lone password-like word is dropped; other programs can't use Morph's helper; window titles are never broadcast |
+| `03-privacy.js` | password manager copies are never read (also after switching apps and waiting); a lone password-like word is dropped; other programs can't use Morph's helper; window titles are never broadcast; Morph's program offers nothing on the bus |
 | `04-layout.js` | pressing Jira/Undo/Save as PDF, and switching options in Settings, move nothing else on the panel |
 | `05-keyboard.js` | Settings works with Tab/Enter/Esc; typing still reaches your app with Morph open; a click outside gives the keyboard back |
 | `06-firstrun.js` | the welcome card on a new install; hover labels; ✕ only folds Morph into its tab |
+| `07-canary.js` | made-up words copied through every feature are then searched for in every file and log (debug on): none may appear; Morph's program runs under strace and may open no connection but the update check, which may send nothing but a request for version.json |
 
 ### Writing a scenario
 
