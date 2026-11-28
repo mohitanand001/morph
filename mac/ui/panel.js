@@ -592,7 +592,7 @@
     if (spec.settled) { busy = null; clearTimeout(busyTimer); }
     if (!(spec.setup && spec.setup.welcome)) welcomeDone = false;
     if (spec.openNow && !open) { open = true; send('opened:'); armIdle(); }
-    if (!spec.visible && open && !hovering && !spec.openNow) open = false;
+    if (!spec.visible && open && !spec.openNow) open = false; // Hide Morph: gone at once, even under the mouse
     if (press || reorder) { pendingRender = true; return; } // drawn when the press ends: never rebuilt under the mouse
     render();
     clearTimeout(collapseTimer);

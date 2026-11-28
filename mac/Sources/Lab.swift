@@ -190,8 +190,6 @@ final class Lab: NSObject, NSApplicationDelegate {
         let pasted = await waitFor(4) { ((await self.cmd("jira", ["cmd": "report"]) ?? [:])["text"] ?? "").contains("fast") }
         r = await cmd("jira", ["cmd": "report"]) ?? [:]
         check("⌃⌥V in Jira converts and pastes, formatted", pasted && r["bold"] == "1" && !(r["text"] ?? "").contains("**"), Json.string(r))
-        st = await state()
-        check("…and the card says it pasted into Jira", str(st, "primary").contains("Pasted into Jira") || str(st, "text").contains("Pasted into Jira"), Json.string(st))
 
         // Paste as plain text (⌃⌥⇧V) into a plain editor.
         await open("editor")

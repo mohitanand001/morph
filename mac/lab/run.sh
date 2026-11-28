@@ -7,6 +7,9 @@
 # Results: $OUT/*.json, one annotation per failure and a summary per part. Never run it on your own Mac: it
 # installs, updates and uninstalls Morph.app in a temporary folder and stops Morph processes it started.
 set -uo pipefail
+# If this script stops early, say where (its own trace, last lines).
+exec 9>"${RUNNER_TEMP:-/tmp}/maclab-trace.txt"; BASH_XTRACEFD=9; set -x
+trap 'c=$?; set +x; [ $c = 0 ] || printf "::notice title=run.sh ended::exit %s :: %s\n" "$c" "$(tail -n 12 "${RUNNER_TEMP:-/tmp}/maclab-trace.txt" | tr "\n%" "  " | cut -c1-2500)"' EXIT
 cd "$(dirname "$0")/../.."
 ROOT=$PWD
 T=${RUNNER_TEMP:?run this in CI}/maclab
