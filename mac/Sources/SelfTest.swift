@@ -152,7 +152,7 @@ final class SelfTest: NSObject, NSApplicationDelegate {
                 let r = Clip.read()
                 let t = Clip.types()
                 let text = r["text"] as? String ?? "", html = r["html"] as? String ?? ""
-                self.check("a copy from another app is read and converted for Slack", text.contains("*ship*") && html.lowercased().contains("<b>ship</b>") || html.lowercased().contains("<strong>ship</strong>"), text + " | " + String(html.prefix(200)))
+                self.check("a copy from another app is read and converted for Slack", text.contains("*ship*") && (html.lowercased().contains("<b>ship</b>") || html.lowercased().contains("<strong>ship</strong>")), text + " | " + String(html.prefix(200)))
                 self.check("…with HTML, RTF and text, marked as Morph's", t.contains("public.html") && t.contains("public.rtf") && t.contains("public.utf8-plain-text") && t.contains("dev.morph.own"), t.joined(separator: ","))
                 // Open the panel: click the tab.
                 self.panel.web.evaluateJavaScript("(function(){var t=document.querySelector('.tab'); if(!t) return 'no tab'; var r=t.getBoundingClientRect(); var o={bubbles:true,button:0,screenX:5,screenY:5,clientX:r.left+5,clientY:r.top+20}; t.dispatchEvent(new MouseEvent('mousedown',o)); window.dispatchEvent(new MouseEvent('mouseup',o)); return 'ok';})()") { res, _ in
