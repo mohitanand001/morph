@@ -512,10 +512,15 @@
     hideTip();
     press = { x: e.screenX, y: e.screenY, tab: isTab, moved: false };
   }
+  // While a mouse button is down, nothing is redrawn: the button you are clicking stays the one that gets the click.
+  let buttonDown = false;
+  window.addEventListener('mousedown', () => { buttonDown = true; }, true);
+  window.addEventListener('mouseup', () => { buttonDown = false; setTimeout(() => { if (pendingRender && !press && !reorder && !buttonDown) render(); }, 0); }, true);
   // The last few mouse events (types and buttons only), for the lab when a click goes wrong.
   const evlog = (window.__ev = []);
   ['mousedown', 'mouseup', 'click', 'mousemove', 'mouseenter', 'mouseleave'].forEach((t) => window.addEventListener(t, (e) => { evlog.push(t + ':' + e.buttons); if (evlog.length > 30) evlog.shift(); }, true));
   window.addEventListener('mousemove', (e) => {
+    if (e.buttons === 0 && buttonDown) { buttonDown = false; if (pendingRender && !press && !reorder) render(); }
     // A press whose release never arrived (the window can lose it): the button is up, so it ended.
     if ((press || reorder) && e.buttons === 0) { finishPress(); return; }
     if (reorder) { reorderMove(e); return; }
@@ -593,7 +598,7 @@
     if (!(spec.setup && spec.setup.welcome)) welcomeDone = false;
     if (spec.openNow && !open) { open = true; send('opened:'); armIdle(); }
     if (!spec.visible && open && !spec.openNow) open = false; // Hide Morph: gone at once, even under the mouse
-    if (press || reorder) { pendingRender = true; return; } // drawn when the press ends: never rebuilt under the mouse
+    if (press || reorder || buttonDown) { pendingRender = true; return; } // drawn when the press ends: never rebuilt under the mouse
     render();
     clearTimeout(collapseTimer);
     if (spec.collapseAfterMs && open) collapseTimer = setTimeout(() => setOpen(false), Math.min(Number(spec.collapseAfterMs) || 1800, 10000));

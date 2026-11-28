@@ -142,6 +142,21 @@ const RES = build(fs.mkdtempSync(path.join(os.tmpdir(), 'morph-mac-ui-')));
   ps = await posts();
   check('Save as PDF sends pdf:', ps.some((p) => p.action === 'pdf:'), JSON.stringify(ps));
 
+  // A new spec arriving while you hold the mouse button on a row waits until you let go: the click still lands.
+  await show(specs.copied);
+  await clearPosts();
+  const conf = await page.locator('.row', { hasText: 'Confluence' }).first().boundingBox();
+  await page.mouse.move(conf.x + 40, conf.y + conf.height / 2);
+  await page.mouse.down();
+  const moved = JSON.parse(JSON.stringify(specs.copied));
+  moved.options = [[{ label: 'Something else', action: 'fix:email', dest: 'email' }]].concat(moved.options);
+  await page.evaluate((x) => window.morphRender(JSON.stringify(x)), moved);
+  await page.mouse.up();
+  await page.waitForTimeout(80);
+  ps = await posts();
+  check('a redraw while the button is held waits: the click goes to the row you pressed', ps.some((p) => p.action === 'fix:confluence') && !ps.some((p) => p.action === 'fix:email'), JSON.stringify(ps));
+  check('…and the new spec is drawn right after', /Something else/.test(await page.locator('.panel').innerText()));
+
   // Settings, every page.
   let n = 5;
   for (const k of Object.keys(specs).filter((x) => /^settings-/.test(x))) {
