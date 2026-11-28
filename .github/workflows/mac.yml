@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 jobs:
+  probe:
+    if: startsWith(github.ref, 'refs/heads/mac-')
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: bash mac/probe/probe.sh
   # Builds Morph.app on a real Mac and runs its self-test (clipboard, text recognition, panel, PDF, shortcuts).
   build:
     runs-on: macos-latest
