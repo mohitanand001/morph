@@ -241,7 +241,8 @@ final class Lab: NSObject, NSApplicationDelegate {
         mouse(.leftMouseUp, NSPoint(x: start.x, y: start.y + 180))
         await sleep(0.8)
         let y1 = settings()["pillYFrac"] as? Double ?? y0
-        check("dragging the tab up moves it, and the place is remembered", panel.window.frame.minY > t0.minY + 100 && y1 < y0 - 0.05 && (await state())["open"] as? Bool == false, "y \(y0) → \(y1), \(t0) → \(panel.window.frame)")
+        let stillClosed = (await state())["open"] as? Bool == false
+        check("dragging the tab up moves it, and the place is remembered", panel.window.frame.minY > t0.minY + 100 && y1 < y0 - 0.05 && stillClosed, "y \(y0) → \(y1), \(t0) → \(panel.window.frame)")
 
         // Hide Morph, then ⌃⌥F brings it back.
         bridge.action("hide:")
