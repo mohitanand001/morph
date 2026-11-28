@@ -55,7 +55,7 @@ cp mac/build/Morph-mac.zip "$SRV/rel/v$V/"
 printf '{ "version": "%s" }\n' "$V" > "$SRV/version.json"
 python3 -m http.server 8765 --bind 127.0.0.1 --directory "$SRV" >/dev/null 2>&1 &
 SERVER=$!
-sleep 1
+for i in $(seq 1 40); do curl -fs -o /dev/null http://127.0.0.1:8765/version.json && break; sleep 0.25; done
 APPS="$T/Applications"
 inst() { MORPH_BASE_URL=http://127.0.0.1:8765 MORPH_RELEASES_URL=http://127.0.0.1:8765/rel MORPH_APPS="$APPS" alarm 120 bash site/install-mac.sh; }
 out1=$(inst 2>&1); code1=$?
