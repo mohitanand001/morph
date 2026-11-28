@@ -273,9 +273,12 @@ final class Lab: NSObject, NSApplicationDelegate {
         check("…and typing still goes to Slack with Morph open", typedHi == "hi", "'\(typedHi)'")
         // Settings with the mouse: the gear, then a switch.
         let auto0 = settings()["autoFormat"] as? Bool ?? true
-        if await clickText(".ib.gear") {
-            await sleep(0.4)
-            let inSettings = str(await state(), "text").contains("Convert automatically")
+        var gear = false, inSettings = false
+        for _ in 0..<3 where !inSettings {
+            gear = await clickText(".ib.gear") || gear
+            inSettings = await waitFor(1.5) { self.str(await self.state(), "text").contains("Convert automatically") }
+        }
+        if gear {
             check("the gear opens Settings", inSettings, String(str(await state(), "text").prefix(200)))
             if await clickText(".opt", containing: "Convert automatically") {
                 await sleep(0.5)
