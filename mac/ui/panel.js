@@ -512,14 +512,20 @@
     hideTip();
     press = { x: e.screenX, y: e.screenY, tab: isTab, moved: false };
   }
+  // The last few mouse events (types and buttons only), for the lab when a click goes wrong.
+  const evlog = (window.__ev = []);
+  ['mousedown', 'mouseup', 'click', 'mousemove', 'mouseenter', 'mouseleave'].forEach((t) => window.addEventListener(t, (e) => { evlog.push(t + ':' + e.buttons); if (evlog.length > 30) evlog.shift(); }, true));
   window.addEventListener('mousemove', (e) => {
+    // A press whose release never arrived (the window can lose it): the button is up, so it ended.
+    if ((press || reorder) && e.buttons === 0) { finishPress(); return; }
     if (reorder) { reorderMove(e); return; }
     if (!press) return;
     if (!press.moved && Math.abs(e.screenX - press.x) + Math.abs(e.screenY - press.y) < 4) return;
     if (!press.moved) { press.moved = true; post({ type: 'drag', phase: 'start' }); }
     post({ type: 'drag', phase: 'move', dx: e.screenX - press.x, dy: e.screenY - press.y });
   });
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('mouseup', finishPress);
+  function finishPress() {
     if (reorder) { reorderEnd(); return; }
     const p = press;
     press = null;
@@ -527,7 +533,7 @@
     if (p.moved) post({ type: 'drag', phase: 'end' });
     if (!p.moved && p.tab && !open) setOpen(true);
     else if (pendingRender) render();
-  });
+  }
 
   // ---------------------------------------------------------------- open, close, idle
   function setOpen(v) {

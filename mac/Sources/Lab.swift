@@ -83,14 +83,21 @@ final class Lab: NSObject, NSApplicationDelegate {
         _ = await waitFor(3) { Clip.changeCount() != before }
         await sleep(0.6) // Morph looks for new copies every 0.3 s
     }
-    /// A real key press, as from the keyboard.
+    /// A real key press, as from the keyboard: the modifier keys go down first, then the key, then all come up.
     func press(_ code: Int, _ flags: CGEventFlags) {
         let src = CGEventSource(stateID: .hidSystemState)
-        let d = CGEvent(keyboardEventSource: src, virtualKey: CGKeyCode(code), keyDown: true)
-        let u = CGEvent(keyboardEventSource: src, virtualKey: CGKeyCode(code), keyDown: false)
-        d?.flags = flags; u?.flags = flags
-        d?.post(tap: .cghidEventTap)
-        u?.post(tap: .cghidEventTap)
+        let mods: [(CGEventFlags, Int)] = [(.maskControl, kVK_Control), (.maskAlternate, kVK_Option), (.maskShift, kVK_Shift), (.maskCommand, kVK_Command)]
+        var held: CGEventFlags = []
+        let post = { (k: Int, down: Bool, f: CGEventFlags) in
+            let e = CGEvent(keyboardEventSource: src, virtualKey: CGKeyCode(k), keyDown: down)
+            e?.flags = f
+            e?.post(tap: .cghidEventTap)
+            usleep(8000)
+        }
+        for (f, k) in mods where flags.contains(f) { held.insert(f); post(k, true, held) }
+        post(code, true, held)
+        post(code, false, held)
+        for (f, k) in mods.reversed() where flags.contains(f) { held.remove(f); post(k, false, held) }
     }
     /// Screen point (Cocoa, from the bottom) to event point (from the top).
     func cg(_ p: NSPoint) -> CGPoint { CGPoint(x: p.x, y: NSScreen.screens[0].frame.height - p.y) }
@@ -237,7 +244,8 @@ final class Lab: NSObject, NSApplicationDelegate {
         check("the tab is at the right edge of the screen", panel.window.isVisible && abs(tab.maxX - (NSScreen.screens[0].visibleFrame.maxX)) < 2 && tab.width < 40, "\(tab)")
         await click(NSPoint(x: tab.midX, y: tab.maxY - 20))
         let opened = await waitFor(3) { (await self.state())["open"] as? Bool == true && self.panel.window.frame.width > 250 }
-        check("a click on the tab opens the panel", opened, "\(panel.window.frame)")
+        let evs = (try? await panel.web.evaluateJavaScript("JSON.stringify(window.__ev || [])") as? String) ?? ""
+        check("a click on the tab opens the panel", opened, "\(panel.window.frame) key=\(panel.window.isKeyWindow) events: \(evs)")
         await snapshot("panel-open")
         st = await state()
         check("the panel shows the copy, Slack as This app, and the other apps", str(st, "text").contains("This app") && str(st, "text").contains("Jira") && str(st, "text").contains("Save as PDF"), String(str(st, "text").prefix(300)))

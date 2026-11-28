@@ -13,6 +13,16 @@ final class Fake: NSObject, NSApplicationDelegate {
     var copies = 0
 
     func applicationDidFinishLaunching(_ n: Notification) {
+        // An Edit menu, so ⌘V, ⌘C and ⌘A work as in any Mac app.
+        let main = NSMenu(), appItem = NSMenuItem(), editItem = NSMenuItem()
+        main.addItem(appItem); main.addItem(editItem)
+        let appMenu = NSMenu(); appMenu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"); appItem.submenu = appMenu
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = edit
+        NSApp.mainMenu = main
         window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 520, height: 320), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = title
         let scroll = NSTextView.scrollableTextView()
@@ -37,13 +47,14 @@ final class Fake: NSObject, NSApplicationDelegate {
         case "copy":
             // As if you selected something and pressed ⌘C in this app.
             let pb = NSPasteboard.general
+            let png = (u["image"] as? String).flatMap(Fake.tablePNG)
             pb.clearContents()
             if let h = u["html"] as? String, !h.isEmpty { pb.setString(h, forType: .html) }
             if let r = u["rtf"] as? String, !r.isEmpty, let a = try? NSAttributedString(data: Data(r.utf8), options: [.documentType: NSAttributedString.DocumentType.html, .characterEncoding: String.Encoding.utf8.rawValue], documentAttributes: nil),
                let d = try? a.data(from: NSRange(location: 0, length: a.length), documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]) { pb.setData(d, forType: .rtf) }
             if let t = u["text"] as? String, !t.isEmpty { pb.setString(t, forType: .string) }
             if (u["concealed"] as? String) == "1" { pb.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")) }
-            if let rows = u["image"] as? String, let png = Fake.tablePNG(rows) { pb.setData(png, forType: .png) }
+            if let png = png { pb.setData(png, forType: .png) }
             copies += 1
             reply(["id": id, "copies": String(copies), "types": (pb.types ?? []).map { $0.rawValue }.joined(separator: ",")])
         case "clear":

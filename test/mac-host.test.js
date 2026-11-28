@@ -173,6 +173,19 @@ const { mac, flush, SRC, SLACK, CHROME_GPT, ONEPW, JIRA, MD } = require('./mac-f
     check('the paste shortcut converts but does not pretend to press ⌘V', m.pastes === 0 && /Ready to paste into Slack/.test(JSON.stringify(m.panel().primary || m.panel())) && /Press ⌘V/.test(m.panel().sub || ''), JSON.stringify([m.panel().primary, m.panel().sub]));
   }
 
+
+  {
+    // An app clears the clipboard first and puts its copy there a moment later.
+    const m = mac();
+    await m.start();
+    m.front = CHROME_GPT;
+    m.pb.count++; m.pb.types = []; m.pb.text = ''; m.pb.html = '';
+    await m.advance(350);
+    m.pb.types = ['public.utf8-plain-text']; m.pb.text = MD.text;
+    await m.advance(1200);
+    check('a copy whose content arrives a moment after the clipboard changed is still read', /ChatGPT/.test(JSON.stringify(m.panel().source)) && /table/.test(JSON.stringify(m.panel().source)), JSON.stringify(m.panel().source));
+  }
+
   console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed (mac host)');
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.log('FAIL  crashed: ' + (e && e.stack)); process.exit(1); });

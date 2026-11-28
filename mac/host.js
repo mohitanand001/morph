@@ -196,7 +196,15 @@ function startMorphMac(native, opts) {
     const n = native.changeCount();
     if (n === seen) return; // nothing new: nothing is read
     seen = n;
-    const types = (parse(native.clipTypes()) || []).map(String);
+    let types = (parse(native.clipTypes()) || []).map(String);
+    // An app clears the clipboard, then puts its copy there: a look in between finds nothing yet. Look again.
+    for (const wait of [120, 300, 700]) {
+      if (types.length || native.changeCount() !== n) break;
+      await sleep(wait);
+      types = (parse(native.clipTypes()) || []).map(String);
+    }
+    if (native.changeCount() !== n) { seen = -1; return; } // a newer copy came meanwhile: that one counts
+    lastRead = null; // read what is there now
     if (types.includes(OWN_TYPE)) { log('clipboard: Morph\'s own write'); return; }
     // The copy was made in the app in front just now (asked at once, before anything else can change it).
     const w = frontNow() || front;
