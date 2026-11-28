@@ -57,7 +57,8 @@ What differs from Linux:
 - `.github/workflows/mac.yml`: builds the app on a real Mac and runs `Morph --selftest` (JavaScriptCore,
   clipboard formats, RTF copies, shortcuts, text recognition on a drawn table, the panel page in WebKit, PDF in
   pages). Results are annotations on the run, and the zip, results and a screenshot of the panel are its artifact.
-  A `v<version>` tag publishes the zip as a release.
+  A `v<version>` tag, or "Run workflow" on the Actions page from main, publishes the zip as the release
+  `v<version>`, which the installer and in-app updates download.
 
 Not checked by machine: Accessibility (window titles, ⌘V) and the pasteboard privacy prompt need a person to allow
 them, so they are tested by hand.

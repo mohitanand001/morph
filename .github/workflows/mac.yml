@@ -4,6 +4,8 @@ on:
     branches: [main, 'mac-*']
     tags: ['v*']
   pull_request:
+  # "Run workflow" on the Actions page (main): builds, self-tests and publishes this version's Mac download.
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -49,9 +51,10 @@ jobs:
           name: morph-mac
           path: ${{ runner.temp }}/selftest
 
-  # A version tag (v0.15.0-rc.19) publishes the Mac app as a release download, for the installer and in-app updates.
+  # Publishes the Mac app as the release v<version> (the installer and in-app updates download it from there):
+  # on a version tag (v0.15.0-rc.19), or on "Run workflow" from main.
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     needs: build
     runs-on: macos-latest
     permissions:
@@ -63,16 +66,17 @@ jobs:
           node-version: 22
       - run: |
           v=$(node -p "require('./package.json').version")
-          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME is not package.json $v"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = tag ]; then [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME is not package.json $v"; exit 1; }; fi
+          echo "TAG=v$v" >> "$GITHUB_ENV"
       - run: bash mac/build.sh
       - name: publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd mac/build
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" Morph-mac.zip Morph-mac.zip.sha256 --clobber
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" Morph-mac.zip Morph-mac.zip.sha256 --clobber
           else
-            gh release create "$GITHUB_REF_NAME" Morph-mac.zip Morph-mac.zip.sha256 --prerelease --title "Morph ${GITHUB_REF_NAME#v}" \
+            gh release create "$TAG" Morph-mac.zip Morph-mac.zip.sha256 --target "$GITHUB_SHA" --prerelease --title "Morph ${TAG#v}" \
               --notes "Morph for Mac (preview). Install: curl -fsSL https://mohitanand001.github.io/morph/install-mac.sh | bash"
           fi
