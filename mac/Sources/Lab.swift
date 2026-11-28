@@ -125,6 +125,30 @@ final class Lab: NSObject, NSApplicationDelegate {
         for k in ["chat", "editor", "keepass", "jira", "slack"] { await open(k) }
         check("the stand-in apps start", ready.count == 5, ready.sorted().joined(separator: ","))
 
+        // Can this process press keys and move the mouse here? (Everything below that uses them depends on it.)
+        let target = NSPoint(x: 123, y: 321)
+        mouse(.mouseMoved, target)
+        await sleep(0.3)
+        let at = NSEvent.mouseLocation
+        check("posting events is allowed (CGPreflightPostEventAccess)", CGPreflightPostEventAccess(), "listen: \(CGPreflightListenEventAccess())")
+        check("a posted mouse move moves the pointer", abs(at.x - target.x) < 2 && abs(at.y - target.y) < 2, "\(at)")
+        await open("editor")
+        _ = await cmd("editor", ["cmd": "clear"])
+        press(kVK_ANSI_A, [])
+        press(kVK_ANSI_B, [])
+        await sleep(0.5)
+        let typed = (await cmd("editor", ["cmd": "report"]) ?? [:])["text"] ?? ""
+        let src2 = CGEventSource(stateID: .combinedSessionState)
+        let d2 = CGEvent(keyboardEventSource: src2, virtualKey: CGKeyCode(kVK_ANSI_C), keyDown: true), u2 = CGEvent(keyboardEventSource: src2, virtualKey: CGKeyCode(kVK_ANSI_C), keyDown: false)
+        d2?.post(tap: .cgSessionEventTap); u2?.post(tap: .cgSessionEventTap)
+        if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
+            let d3 = CGEvent(keyboardEventSource: src2, virtualKey: CGKeyCode(kVK_ANSI_D), keyDown: true), u3 = CGEvent(keyboardEventSource: src2, virtualKey: CGKeyCode(kVK_ANSI_D), keyDown: false)
+            d3?.postToPid(pid); u3?.postToPid(pid)
+        }
+        await sleep(0.5)
+        let typed2 = (await cmd("editor", ["cmd": "report"]) ?? [:])["text"] ?? ""
+        check("posted key presses reach the app in front", typed == "ab", "hid: '\(typed)', then session + pid: '\(typed2)'")
+
         // The window in front, by its title (needs Accessibility): a Jira tab in a "browser".
         await open("jira")
         let f = Front.now()
