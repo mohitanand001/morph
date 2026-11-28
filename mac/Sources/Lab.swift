@@ -76,9 +76,10 @@ final class Lab: NSObject, NSApplicationDelegate {
         _ = await waitFor(5) { self.replies[id] != nil }
         return replies[id]
     }
+    var lastCopy: [String: String] = [:]
     func copy(_ key: String, _ info: [String: String]) async {
         let before = Clip.changeCount()
-        _ = await cmd(key, ["cmd": "copy"].merging(info) { $1 })
+        lastCopy = await cmd(key, ["cmd": "copy"].merging(info) { $1 }) ?? [:]
         _ = await waitFor(3) { Clip.changeCount() != before }
         await sleep(0.6) // Morph looks for new copies every 0.3 s
     }
@@ -198,7 +199,7 @@ final class Lab: NSObject, NSApplicationDelegate {
         await copy("chat", ["image": "Employee|Basic|Allowance|Net Pay;James Miller|4200|300|4500;Ana Lopez|3900|250|4150;Bo Chen|5100|400|5500"])
         await open("slack")
         st = await state()
-        check("a copied picture: the card offers to read its table", str(st, "source").contains("Image copied"), str(st, "source"))
+        check("a copied picture: the card offers to read its table", str(st, "source").contains("Image copied"), str(st, "source") + " | copied: " + Json.string(lastCopy) + " | now: " + Clip.types().joined(separator: ","))
         bridge.action("fix:slack")
         let table = await waitFor(8) { self.ownOnClipboard() && self.clipText().contains("James Miller") }
         check("picking Slack reads the table from the picture", table, clipText())
@@ -253,7 +254,9 @@ final class Lab: NSObject, NSApplicationDelegate {
         check("⌃⌥F brings it back", back)
 
         // Settings → Privacy shows the Mac's permissions.
+        _ = try? await panel.web.evaluateJavaScript("(function(){var t=document.querySelector('.tab'); if(!t) return; var r=t.getBoundingClientRect(); var o={bubbles:true,button:0,screenX:5,screenY:5,clientX:r.left+5,clientY:r.top+20}; t.dispatchEvent(new MouseEvent('mousedown',o)); window.dispatchEvent(new MouseEvent('mouseup',o));})()")
         bridge.action("view:privacy")
+        await sleep(0.5)
         st = await state()
         check("Settings → Privacy shows Accessibility on", str(st, "text").contains("Accessibility: on"), String(str(st, "text").prefix(600)))
         await snapshot("privacy")

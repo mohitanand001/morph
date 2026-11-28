@@ -36,6 +36,12 @@ plist_version() { /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString'
 # ---------------------------------------------------------------- 1. the lab
 bash mac/lab/build-fakes.sh "$T/apps" >/dev/null || { echo "::error title=FAIL::could not build the stand-in apps"; exit 1; }
 mkdir -p "$T/home-lab"
+# The CI Mac has no person to click "Allow": give this Morph Accessibility and "post events" (pressing keys and
+# clicking) in the system's permission database, as the runner's own tools have. (The CI Mac runs without SIP.)
+for svc in kTCCServiceAccessibility kTCCServicePostEvent; do
+  sudo sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" \
+    "insert or replace into access (service,client,client_type,auth_value,auth_reason,auth_version,csreq,flags) values ('$svc','$APP/Contents/MacOS/Morph',1,2,4,1,NULL,0)" || echo "::warning::could not grant $svc"
+done
 MORPH_HOME="$T/home-lab" MORPH_LAB_APPS="$T/apps" alarm 400 "$APP/Contents/MacOS/Morph" --lab "$OUT/lab.json"
 if [ -f "$OUT/lab.json" ]; then report_json "$OUT/lab.json" lab || fail=1; else echo "::error title=FAIL lab::the lab wrote no results"; fail=1; fi
 tail -n 40 "$T/home-lab/Logs/Morph.log" 2>/dev/null

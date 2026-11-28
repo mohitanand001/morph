@@ -45,7 +45,7 @@ final class Fake: NSObject, NSApplicationDelegate {
             if (u["concealed"] as? String) == "1" { pb.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")) }
             if let rows = u["image"] as? String, let png = Fake.tablePNG(rows) { pb.setData(png, forType: .png) }
             copies += 1
-            reply(["id": id, "copies": String(copies)])
+            reply(["id": id, "copies": String(copies), "types": (pb.types ?? []).map { $0.rawValue }.joined(separator: ",")])
         case "clear":
             text.string = ""
             reply(["id": id])
