@@ -20,6 +20,8 @@ Needs GNOME (tested on Ubuntu with Wayland) and `gjs`, which GNOME already inclu
 
 You can read the installer first: [`site/install.sh`](site/install.sh).
 
+**On a Mac (preview):** `curl -fsSL https://mohitanand001.github.io/morph/install-mac.sh | bash` (macOS 13 or newer). See [mac/README.md](mac/README.md).
+
 ## What it does
 
 - **Tables**: Slack text tables, spreadsheet ranges, psql/mysql output and HTML tables become real tables in Jira, Confluence, Slack, Outlook and Google Docs.
