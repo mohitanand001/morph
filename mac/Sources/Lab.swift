@@ -17,7 +17,7 @@ final class Lab: NSObject, NSApplicationDelegate {
     var seq = 0
     let ids = ["slack": "com.tinyspeck.slackmacgap", "jira": "dev.morph.lab.browser.jira", "chat": "dev.morph.lab.browser.chat", "keepass": "org.keepassxc.keepassxc", "editor": "dev.morph.lab.editor"]
 
-    init(out: String) { self.out = out }
+    nonisolated init(out: String) { self.out = out; super.init() }
 
     func check(_ name: String, _ ok: Bool, _ detail: String = "") {
         results.append(["name": name, "ok": ok, "detail": String(detail.prefix(500))])
