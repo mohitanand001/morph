@@ -110,6 +110,14 @@ final class Lab: NSObject, NSApplicationDelegate {
               let j = try? JSONSerialization.jsonObject(with: Data(s.utf8)) as? [String: Any] else { return [:] }
         return j
     }
+    /// Clicks, with the real mouse, the first element of the panel matching a CSS selector (and holding some text).
+    func clickText(_ sel: String, containing: String = "") async -> Bool {
+        let js = "(function(){var e=[...document.querySelectorAll(\(Json.string([sel]).dropFirst().dropLast()))].find(function(x){return x.innerText.indexOf(\(Json.string([containing]).dropFirst().dropLast()))>=0}); if(!e) return ''; var r=e.getBoundingClientRect(); return JSON.stringify([r.left+r.width/2, r.top+r.height/2]);})()"
+        guard let s = try? await panel.web.evaluateJavaScript(js) as? String, let xy = try? JSONSerialization.jsonObject(with: Data(s.utf8)) as? [Double], xy.count == 2 else { return false }
+        let w = panel.window.frame
+        await click(NSPoint(x: w.minX + xy[0], y: w.maxY - xy[1]))
+        return true
+    }
     func str(_ d: [String: Any], _ k: String) -> String { d[k] as? String ?? "" }
     func settings() -> [String: Any] {
         guard let d = try? Data(contentsOf: paths.settings), let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [:] }
@@ -256,6 +264,28 @@ final class Lab: NSObject, NSApplicationDelegate {
             check("clicking Jira in the panel converts for Jira", jiraDone && clipHtml().contains("<table"), String(clipHtml().prefix(200)))
             check("…and the panel stays open, where it was", panel.window.frame.width == w.width && abs(panel.window.frame.maxY - w.maxY) < 1, "\(w) → \(panel.window.frame)")
         } else { check("the Jira row can be found", false, jiraRow ?? "") }
+        // Clicking Morph never takes the keyboard or the front from your app.
+        check("after clicks on the panel, Slack is still the app in front", NSWorkspace.shared.frontmostApplication?.bundleIdentifier == ids["slack"], NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "")
+        _ = await cmd("slack", ["cmd": "clear"])
+        press(kVK_ANSI_H, []); press(kVK_ANSI_I, [])
+        await sleep(0.5)
+        let typedHi = (await cmd("slack", ["cmd": "report"]) ?? [:])["text"] ?? ""
+        check("…and typing still goes to Slack with Morph open", typedHi == "hi", "'\(typedHi)'")
+        // Settings with the mouse: the gear, then a switch.
+        let auto0 = settings()["autoFormat"] as? Bool ?? true
+        if await clickText(".ib.gear") {
+            await sleep(0.4)
+            let inSettings = str(await state(), "text").contains("Convert automatically")
+            check("the gear opens Settings", inSettings, String(str(await state(), "text").prefix(200)))
+            if await clickText(".opt", containing: "Convert automatically") {
+                await sleep(0.5)
+                check("clicking Convert automatically turns it off, and it is saved", (settings()["autoFormat"] as? Bool) == !auto0, Json.string(settings()))
+                _ = await clickText(".opt", containing: "Convert automatically")
+                await sleep(0.4)
+            } else { check("the Convert automatically switch can be found", false) }
+            await snapshot("settings")
+            _ = await clickText(".ib.back")
+        } else { check("the gear can be found", false) }
         // A click elsewhere folds it into the tab (and still reaches that app).
         let slackWin = NSRect(x: 260, y: 260, width: 400, height: 200)
         await click(NSPoint(x: slackWin.midX, y: slackWin.midY))
