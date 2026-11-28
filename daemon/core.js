@@ -189,10 +189,15 @@ function createCore(io) {
     if (readLog.length > 30) readLog.shift();
   }
   // Called for every "something was copied" signal, before anything is read. true: go ahead and read.
-  function mayRead() {
-    const pm = !!winNow && PASSWORD_APPS.test(String(winNow.app || '') + ' ' + String(winNow.title || ''));
-    if (!pm && (settings.readFrom === 'any' || currentRule)) return true;
-    lastSkip = { app: appLabel(winNow), pm };
+  // from: the window that was in front when the copy happened (the helper notes it at that moment). Deciding from
+  // the app in front *now* would read a password copied in a manager as soon as you switch to another app.
+  // secret: the app marked the copy as secret.
+  function mayRead(from, secret) {
+    const w = from && (from.app || from.title) ? from : winNow;
+    const pm = !!secret || (!!w && PASSWORD_APPS.test(String(w.app || '') + ' ' + String(w.title || '')));
+    const rule = w === winNow ? currentRule : (w ? matchRule(activeRules(), w) : null);
+    if (!pm && (settings.readFrom === 'any' || rule)) return true;
+    lastSkip = { app: appLabel(w), pm };
     note('skipped', lastSkip.app, 0);
     clipStatus = 'Not read: copied from ' + lastSkip.app;
     original = null;
@@ -704,29 +709,33 @@ function createCore(io) {
   }
 
   // ---------------------------------------------------------------- copies and focus
-  function onExternalCopy(text) {
+  function onExternalCopy(text, from) {
     copySeq++;
     tick = null;
     autoDoneDest = null;
-    copyRuleId = currentRule ? currentRule.id : '';
-    copyWin = { text: typeof text === 'string' ? text : null, win: winNow ? { app: winNow.app, title: winNow.title } : null, rule: currentRule };
+    const w = from && (from.app || from.title) ? { app: from.app || '', title: from.title || '' } : (winNow ? { app: winNow.app, title: winNow.title } : null);
+    const rule = from ? (w ? matchRule(activeRules(), w) : null) : currentRule;
+    copyRuleId = rule ? rule.id : '';
+    copyWin = { text: typeof text === 'string' ? text : null, win: w, rule };
     copyFlashUntil = io.now() + 2000;
     io.clearTimeout(copyFlashTimer);
     copyFlashTimer = io.setTimeout(() => { copyFlashUntil = 0; sendPill(); }, 2000);
   }
   // pre: a clipboard reading the caller already made (so it is read once, not twice).
-  async function clipboardChanged(pre) {
+  // from: the window in front when the copy happened, from the helper, which also told the caller it was not
+  // Morph's own write. Without it (an older helper), "ours" is guessed from the text and the time.
+  async function clipboardChanged(pre, from) {
     const sh = pre !== undefined ? pre : await readNow();
     // Ours if the text matches (ignoring line-ending and trailing-space differences clipboards add),
     // or if it arrives right after our own write. Some conversions read back slightly different,
     // and counting those as a new copy would wipe the ✓ at once.
     const sameText = !!sh && !sh.secret && isOurs(sh);
-    const justWrote = io.now() <= ownWriteUntil;
-    const ours = sameText || justWrote;
+    const justWrote = !from && io.now() <= ownWriteUntil; // a guess only when the helper can't say: it could swallow your copy
+    const ours = (!from && sameText) || justWrote;
     log('clipboard changed:', ours ? 'ours (' + (sameText ? 'same text' : 'just written') + ')' : 'a new copy');
     if (ours) return;
     if (sh && sh.secret) return;
-    onExternalCopy(sh ? sh.text : null);
+    onExternalCopy(sh ? sh.text : null, from);
     await refreshClip();
     maybeAutoFormat();
   }
@@ -1015,10 +1024,13 @@ function createCore(io) {
   }
 
   // ---------------------------------------------------------------- start
-  async function start() {
+  // already: what the helper knows about the copy already on the clipboard ({ app, title, secret }), if it can say.
+  async function start(already) {
     load();
     sendPill();
-    if (readsEverything()) await refreshClip(); // whatever is on the clipboard already (only if you chose to read every app)
+    // Whatever is on the clipboard already: only if you chose to read every app, and only if the app it was
+    // copied in may be read (a helper that can't say where it was copied: as before).
+    if (readsEverything() && (already === undefined || (already && mayRead(already, already.secret)))) await refreshClip();
     io.setTimeout(() => { checkUpdates(false); }, 20000);
     scheduleUpdateChecks();
   }

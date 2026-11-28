@@ -60,3 +60,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Report bugs through GitHub Issues. For s
 ## License
 
 Morph is source-available under the [Functional Source License 1.1 (Apache 2.0 future license)](LICENSE). You can use, modify and share it for any purpose except offering a competing commercial product. Each version becomes Apache 2.0 two years after it is released.
+
+## Testing
+
+`npm test` runs the fast tests; `npm run lab` runs Morph Lab, which drives a real (headless) GNOME Shell with Morph and stand-in apps, and writes an HTML report with screenshots. See [TESTING.md](TESTING.md).

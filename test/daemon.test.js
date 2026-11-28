@@ -374,6 +374,24 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
     await c.clipboardChanged();
     check('a bare web address is still read', c.state.original !== null);
   }
+  // --- privacy is decided by the app the copy was made in, not the app in front when Morph looks
+  {
+    const d = desk({ saved: JSON.stringify({ setupDone: true }) });
+    const c = createCore(d.io);
+    await c.start(null);
+    c.focus({ app: 'com.slack.Slack', title: 'general - Slack' }, 33);
+    check('a copy made in a password manager may not be read, even with Slack in front now', c.mayRead({ app: 'org.keepassxc.KeePassXC', title: 'Passwords - KeePassXC' }) === false);
+    check('a copy the app marked secret may not be read', c.mayRead({ app: 'com.slack.Slack', title: 'general - Slack' }, true) === false);
+    check('a copy made in Slack may be read', c.mayRead({ app: 'com.slack.Slack', title: 'general - Slack' }) === true);
+    d.copy({ text: 'Quarterly plan for the team', html: '' });
+    await c.clipboardChanged({ formats: ['text/plain'], secret: false, text: 'Quarterly plan for the team', html: '' }, { app: 'org.gnome.TextEditor', title: 'plan.txt - Text Editor' });
+    check('the card names the app the copy was made in, not the one in front', /TextEditor|Text Editor/.test(JSON.stringify(d.last().source)), JSON.stringify(d.last().source));
+    const d2 = desk({ saved: JSON.stringify({ setupDone: true }) });
+    const c2 = createCore(d2.io);
+    d2.io.shell.readClip = async () => ({ formats: ['text/plain'], secret: false, text: 'secret thing here', html: '' });
+    await c2.start({ app: 'org.keepassxc.KeePassXC', title: 'KeePassXC', secret: false });
+    check('at start, what a password manager left on the clipboard is not read', c2.state.original === null);
+  }
   console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed (daemon)');
   process.exit(failed ? 1 : 0);
 })();

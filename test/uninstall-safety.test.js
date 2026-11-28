@@ -52,6 +52,8 @@ function unpackMorph(dest) {
   put(home + '/.config/autostart/formatter.desktop', '[Desktop Entry]\nExec=/usr/bin/some-formatter\n');
   put(home + '/.cache/formatter.log', 'theirs');
   put(home + '/.cache/formatter-icons/a.png', 'theirs');
+  put(home + '/.cache/morph-icons/slack.svg', '<svg/>'); put(home + '/.cache/morph-icons/ui-close-657b83.svg', '<svg/>'); put(home + '/.cache/morph-icons/tab-3.svg', '<svg/>');
+  put(home + '/.cache/formatter-icons/jira.svg', '<svg/>');
   put(home + '/run/morph/notes.txt', 'theirs');
   put(app + '/my-notes.txt', 'a file you put in the folder');
   const r = spawnSync('bash', [app + '/bin/morph', '--uninstall'], { env, encoding: 'utf8' });
@@ -66,6 +68,7 @@ function unpackMorph(dest) {
     exists(home + '/.config/formatter/init.lua') && exists(home + '/.config/formatter/settings.json') && exists(home + '/.config/autostart/formatter.desktop') &&
     exists(home + '/.cache/formatter.log') && exists(home + '/.cache/formatter-icons/a.png'));
   check('another program\'s file in the private folder is kept', exists(home + '/run/morph/notes.txt'));
+  check('Morph\'s icon files are removed by name, and their folder; another file in the old icon folder stays', !exists(home + '/.cache/morph-icons') && !exists(home + '/.cache/formatter-icons/jira.svg') && exists(home + '/.cache/formatter-icons/a.png'));
   const rc = fs.readFileSync(home + '/.bashrc', 'utf8');
   check('~/.bashrc loses exactly Morph\'s two lines', !/^# morph PATH$/m.test(rc) && /# my morph PATH notes\nexport KEEP_ME=1/.test(rc) && /export AFTER=1/.test(rc) && /alias ll/.test(rc), JSON.stringify(rc));
   check('the download lists every file it holds, so each can be removed by name', entries.includes('MANIFEST'));

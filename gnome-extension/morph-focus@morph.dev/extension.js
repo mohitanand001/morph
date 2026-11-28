@@ -43,13 +43,14 @@ import { Slider } from 'resource:///org/gnome/shell/ui/slider.js';
 import * as ModalDialog from 'resource:///org/gnome/shell/ui/modalDialog.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const PILL_VERSION = 31;
+const PILL_VERSION = 33;
 const IFACE = `
 <node>
   <interface name="dev.morph.Focus">
     <method name="Get"><arg type="s" direction="out" name="info"/></method>
     <method name="SetPill"><arg type="s" direction="in" name="state"/></method>
     <method name="ReadClipboard"><arg type="s" direction="out" name="clip"/></method>
+    <method name="ClipboardInfo"><arg type="s" direction="out" name="info"/></method>
     <method name="ReadImage"><arg type="s" direction="out" name="image"/></method>
     <method name="Paste"><arg type="b" direction="in" name="shift"/></method>
     <method name="SetShortcuts"><arg type="s" direction="in" name="list"/><arg type="s" direction="out" name="failed"/></method>
@@ -94,7 +95,7 @@ const b64 = (s) => GLib.base64_encode(new TextEncoder().encode(s));
 const DAEMON_NAME = 'dev.morph.Daemon';
 const OBJ_PATH = '/dev/morph/Focus';
 const IFACE_NAME = 'dev.morph.Focus';
-const METHOD_OUT = { Get: '(s)', SetPill: null, ReadClipboard: '(s)', ReadImage: '(s)', Paste: null, SetShortcuts: '(s)', WriteClipboard: null };
+const METHOD_OUT = { Get: '(s)', SetPill: null, ReadClipboard: '(s)', ClipboardInfo: '(s)', ReadImage: '(s)', Paste: null, SetShortcuts: '(s)', WriteClipboard: null };
 function readLink(p) { try { return GLib.file_read_link(p); } catch (e) { return ''; } }
 function isMorphDaemon(pid) {
   try {
@@ -180,8 +181,24 @@ export default class FormatBridgeHelper extends Extension {
     this._monitorsId = Main.layoutManager.connect('monitors-changed', () => this._place());
     // New copies, in any app.
     this._selection = global.display.get_selection();
-    this._ownerId = this._selection.connect('owner-changed', (_sel, type) => {
-      if (type === Meta.SelectionType.SELECTION_CLIPBOARD && this._dbus) this._signal('ClipboardChanged', new GLib.Variant('(s)', ['']));
+    // Every copy, as it happens: which app was in front at that moment (Morph decides from this whether it may
+    // read, never from the app in front later), whether it was Morph's own write, and whether the app marked it
+    // secret. No content: that is only read on request, and only if Morph may.
+    this._clip = { serial: 0, boot: GLib.uuid_string_random().slice(0, 8), own: false, app: '', title: '', secret: false };
+    this._ownerId = this._selection.connect('owner-changed', (_sel, type, source) => {
+      if (type !== Meta.SelectionType.SELECTION_CLIPBOARD) return;
+      const w = global.display.focus_window;
+      let mimes = [];
+      try { mimes = source ? source.get_mimetypes() || [] : []; } catch (e) { mimes = []; }
+      this._clip = {
+        serial: (this._clip ? this._clip.serial : 0) + 1,
+        boot: this._clip.boot, // a new helper starts counting again: the pair tells copies apart
+        own: !!this._writing,
+        app: w ? String(w.get_wm_class() || w.get_gtk_application_id() || '').slice(0, 120) : '',
+        title: w ? String(w.get_title() || '').slice(0, 300) : '',
+        secret: mimes.some((m) => SECRET_MIME.test(m)),
+      };
+      if (this._dbus) this._signal('ClipboardChanged', new GLib.Variant('(s)', [JSON.stringify(this._clip)]));
     });
     // A click anywhere else tucks the pill away.
     this._captureId = global.stage.connect('captured-event', (_stage, event) => this._outsideClick(event));
@@ -331,9 +348,13 @@ export default class FormatBridgeHelper extends Extension {
   WriteClipboard(mimetype, data) {
     const clipboard = St.Clipboard.get_default();
     const bytes = GLib.base64_decode(data);
-    if (mimetype === 'text/plain') clipboard.set_text(CB, new TextDecoder().decode(bytes));
-    else if (mimetype === 'text/html') clipboard.set_content(CB, 'text/html', new GLib.Bytes(bytes));
+    this._writing = true; // the copy this causes is Morph's own (owner-changed fires during the call)
+    try {
+      if (mimetype === 'text/plain') clipboard.set_text(CB, new TextDecoder().decode(bytes));
+      else if (mimetype === 'text/html') clipboard.set_content(CB, 'text/html', new GLib.Bytes(bytes));
+    } finally { this._writing = false; }
   }
+  ClipboardInfo() { return JSON.stringify(this._clip || { serial: 0 }); }
 
   // Ctrl V into the window in front: the pill never takes focus, so the
   // app you were in still has it.
@@ -791,7 +812,7 @@ export default class FormatBridgeHelper extends Extension {
       if (!key || !ICON_SVG[key]) return null;
       if (!this._iconFiles) this._iconFiles = {};
       if (!this._iconFiles[key]) {
-        const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'formatter-icons']);
+        const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'morph-icons']);
         GLib.mkdir_with_parents(dir, 0o755);
         const path = GLib.build_filenamev([dir, key + '.svg']);
         GLib.file_set_contents(path, ICON_SVG[key]);
@@ -808,7 +829,7 @@ export default class FormatBridgeHelper extends Extension {
       if (!key || !ICON_SVG[key]) return null;
       if (!this._iconFiles) this._iconFiles = {};
       if (!this._iconFiles[key]) {
-        const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'formatter-icons']);
+        const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'morph-icons']);
         GLib.mkdir_with_parents(dir, 0o755);
         const path = GLib.build_filenamev([dir, key + '.svg']);
         GLib.file_set_contents(path, ICON_SVG[key]);
@@ -990,7 +1011,7 @@ export default class FormatBridgeHelper extends Extension {
     try {
       if (!this._tabFiles) this._tabFiles = [];
       if (!this._tabFiles[i]) {
-        const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'formatter-icons']);
+        const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'morph-icons']);
         GLib.mkdir_with_parents(dir, 0o755);
         const path = GLib.build_filenamev([dir, 'tab-' + i + '.svg']);
         GLib.file_set_contents(path, TAB_FRAMES[i]);
@@ -1020,7 +1041,7 @@ export default class FormatBridgeHelper extends Extension {
       const key = name + '-' + hex.slice(1);
       if (!this._iconFiles) this._iconFiles = {};
       if (!this._iconFiles[key]) {
-        const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'formatter-icons']);
+        const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'morph-icons']);
         GLib.mkdir_with_parents(dir, 0o755);
         const path = GLib.build_filenamev([dir, 'ui-' + key + '.svg']);
         GLib.file_set_contents(path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path fill="' + hex + '" d="' + d + '"/></svg>');
@@ -1607,6 +1628,11 @@ export default class FormatBridgeHelper extends Extension {
         gb.connect('clicked', go);
         card.add_child(gb);
       }
+    } else {
+      // No button right now (Check again / Undo come and go): its room stays, so the card's text never reflows.
+      const hold = this._ib('fb-ghost-ib', 'undo', '', () => {});
+      hold.opacity = 0; hold.reactive = false;
+      card.add_child(hold);
     }
     this._body.add_child(card);
     // What the app just said: its own line under the card (wraps at the panel width).

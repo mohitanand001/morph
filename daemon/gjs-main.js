@@ -330,7 +330,41 @@ async function probe() {
 let clipSig = null;
 let clipAt = 0;
 const sigOf = (sh) => (!sh ? 'none' : sh.secret ? 'secret' : (sh.formats || []).join(',') + '|' + sh.text.length + '|' + sh.text.slice(0, 200) + '|' + sh.html.length);
-async function checkClip(fromSignal) {
+// The helper's note about the latest copy, made at the moment of copying: { serial, own, app, title, secret }.
+// It holds no content. null: an older helper that can't say.
+let lastSerial = null; // "<helper boot>:<serial>" of the copy last looked at
+async function clipInfo() {
+  const t = text(await call('ClipboardInfo', null, 1500));
+  try { const j = t ? JSON.parse(t) : null; return j && Number.isInteger(j.serial) ? j : null; } catch (e) { return null; }
+}
+async function checkClip(fromSignal, sigInfo) {
+  const info = sigInfo || await clipInfo();
+  if (info) {
+    // Nothing new since the last look: nothing is read (the regular look costs no clipboard read at all).
+    const id = (info.boot || '') + ':' + info.serial;
+    if (id === lastSerial) return;
+    lastSerial = id;
+    if (info.own) { log('clipboard: Morph\'s own write'); return; }
+    const from = { app: info.app || '', title: info.title || '' };
+    // Privacy: decided by the app the copy was made in, before anything is read.
+    if (!core.mayRead(from, !!info.secret)) { clipSig = null; log('clipboard: not read (copied in', from.app || 'an unknown app', ')'); return; }
+    // An app can announce a copy a moment before it is ready to hand it over: an empty answer is asked again.
+    let sh = await shell.readClip();
+    const empty = (x) => !!x && !x.secret && !x.text && !x.html && !(x.formats || []).some((m) => /^image\//.test(m));
+    for (const wait of [120, 300, 700, 1500]) {
+      if (!(sh === null || empty(sh))) break;
+      await new Promise((r) => setTimeoutG(r, wait));
+      const now = await clipInfo();
+      if (now && ((now.boot || '') + ':' + now.serial) !== id) return; // a newer copy came meanwhile: that one counts
+      sh = await shell.readClip();
+    }
+    clipSig = sigOf(sh);
+    clipAt = Date.now();
+    log('clipboard', fromSignal ? 'signal' : 'poll', '#' + info.serial, sh ? (sh.secret ? 'secret' : (sh.text.length + ' chars text, ' + sh.html.length + ' chars html')) : 'unreadable');
+    await core.clipboardChanged(sh && !sh.secret ? sh : (sh ? { secret: true } : null), from);
+    return;
+  }
+  // An older helper: decide by the app in front now.
   // Privacy: ask first. Nothing is read for a copy from an app that was not listed (or before setup is answered).
   if (!core.mayRead()) { clipSig = null; return; }
   const sh = await shell.readClip();
@@ -348,7 +382,11 @@ bus.signal_subscribe(DEST, IFACE, null, OBJ, null, Gio.DBusSignalFlags.NONE, saf
   const arg = params.deepUnpack()[0];
   if (name !== 'Changed') log('signal:', name, String(arg).slice(0, 40));
   if (name === 'Action') core.action(arg);
-  else if (name === 'ClipboardChanged') checkClip(true).catch((e) => warn('clipboard check failed:', e && e.message));
+  else if (name === 'ClipboardChanged') {
+    let info = null;
+    try { const j = arg ? JSON.parse(arg) : null; info = j && Number.isInteger(j.serial) ? j : null; } catch (e) { info = null; }
+    checkClip(true, info).catch((e) => warn('clipboard check failed:', e && e.message));
+  }
   else if (name === 'Changed') { let j = null; try { j = JSON.parse(dec(arg)); } catch (e) { j = null; } const info = windowInfo(j); if (info) onWindow(info); }
 }));
 
@@ -384,14 +422,17 @@ GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
     if (duplicate) return;
     await probe();
     log('helper answered:', unavailable ? 'no' : failures === 0 ? 'yes' : 'not yet');
-    await core.start();
+    const already = await clipInfo();
+    if (already) lastSerial = (already.boot || '') + ':' + already.serial; // what is there now is not "new"
+    await core.start(already ? (already.serial > 0 ? { app: already.app, title: already.title, secret: !!already.secret } : null) : undefined);
     log('started');
-    clipSig = core.readsEverything() ? sigOf(await shell.readClip()) : null; // what is there now is not "new"
+    clipSig = !already && core.readsEverything() ? sigOf(await shell.readClip()) : null; // (an older helper: the content is the marker)
     GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1800, () => { probe().catch(() => {}); return GLib.SOURCE_CONTINUE; });
     let polling = false;
     GLib.timeout_add(GLib.PRIORITY_DEFAULT, 700, () => {
-      // The poll reads, so it runs only when you chose "any app". Otherwise only the helper's copy signal triggers a read.
-      if (!polling && core.readsEverything()) { polling = true; checkClip(false).catch((e) => warn('clipboard poll failed:', e && e.message)).finally(() => { polling = false; }); }
+      // A regular look in case a copy signal was missed. With a current helper it reads no content: it asks only
+      // whether a new copy was made (and where). An older helper's look reads, so then it runs only with "any app".
+      if (!polling && (lastSerial !== null || core.readsEverything())) { polling = true; checkClip(false).catch((e) => warn('clipboard poll failed:', e && e.message)).finally(() => { polling = false; }); }
       return GLib.SOURCE_CONTINUE;
     });
   })();

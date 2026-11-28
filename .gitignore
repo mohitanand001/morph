@@ -5,3 +5,4 @@ dist/
 test/out/
 !docs/*.zip
 __pycache__/
+test-results/

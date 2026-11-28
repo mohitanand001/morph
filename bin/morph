@@ -292,6 +292,14 @@ do_uninstall() {
     ours_settings "$d/settings.json" && { rm -f -- "$d/settings.json" "$d/settings.json.bak"; rmdir -- "$d" 2>/dev/null || true; }
   done
   rm -f "$CACHE/morph.log" "$CACHE/morph-ocr.log" "$CACHE/formatter-linker.log"
+  # The icons the GNOME helper draws with: Morph's own names only (its folder, and the one older versions used).
+  ICONS="gitbranch terminal slack notion googledocs jira confluence gmail linear markdown obsidian googlesheets mail notes groups"
+  for d in "$CACHE/morph-icons" "$CACHE/formatter-icons"; do
+    [ -d "$d" ] || continue
+    for n in $ICONS; do rm -f -- "$d/$n.svg"; done
+    rm -f -- "$d"/tab-[0-9].svg "$d"/tab-[0-9][0-9].svg "$d"/ui-*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].svg
+    rmdir -- "$d" 2>/dev/null || true
+  done
   # Image tables: Morph's own folder (its name is Morph's), and the private folder for copied images.
   remove_ocr_files; left_note "$OCR_DIR"
   [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -d "$XDG_RUNTIME_DIR/morph" ] && { rm -f "$XDG_RUNTIME_DIR"/morph/clip-image*; rmdir "$XDG_RUNTIME_DIR/morph" 2>/dev/null || true; }

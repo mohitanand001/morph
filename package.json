@@ -1,7 +1,7 @@
 {
   "name": "morph",
   "productName": "Morph",
-  "version": "0.15.0-rc.15",
+  "version": "0.15.0-rc.16",
   "description": "Copy from Slack, Jira, Confluence, Outlook, Docs, spreadsheets, AI chats or a terminal, and paste correctly anywhere.",
   "main": "main.js",
   "author": "Morph",
@@ -10,6 +10,8 @@
   "scripts": {
     "start": "electron .",
     "test": "node test/run-all.js",
+    "lab": "node test/lab/run.js",
+    "test:all": "node test/run-all.js && node test/lab/run.js",
     "dist:linux": "electron-builder --linux AppImage deb",
     "dist:mac": "electron-builder --mac dmg"
   },
