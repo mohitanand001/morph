@@ -68,7 +68,7 @@ before=$(ls "$HOME/.Trash" 2>/dev/null | grep -c '^Morph-' || true)
 out2=$(inst 2>&1); code2=$?
 sleep 2
 after=$(ls "$HOME/.Trash" 2>/dev/null | grep -c '^Morph-' || true)
-check "running it again replaces the app, the old one goes to the Bin" "$([ $code2 = 0 ] && [ "$after" -gt "$before" ] && [ "$(morph_pids "$APPS" | wc -l | tr -d ' ')" = 1 ] && echo 1)" "$out2 / bin $before→$after / pids $(morph_pids "$APPS" | tr '\n' ' ')"
+check "running it again replaces the app, the old one goes to the Bin" "$([ $code2 = 0 ] && [ "$after" -gt "$before" ] && [ "$(morph_pids "$APPS" | wc -l | tr -d ' ')" = 1 ] && echo 1)" "$out2 / bin ${before}→${after} / pids $(morph_pids "$APPS" | tr '\n' ' ')"
 cp "$SRV/rel/v$V/Morph-mac.zip.sha256" "$T/sha.keep"
 printf '%064d  Morph-mac.zip\n' 0 > "$SRV/rel/v$V/Morph-mac.zip.sha256"
 out3=$(inst 2>&1); code3=$?
@@ -90,7 +90,7 @@ uout=$(MORPH_HOME="$T/home-upd" MORPH_RELEASES_URL=http://127.0.0.1:8765/rel/ al
 sleep 3
 after=$(ls "$HOME/.Trash" 2>/dev/null | grep -c '^Morph' || true)
 check "the updater downloads $NEW, checks it and puts it in place" "$([ $ucode = 0 ] && [ "$(plist_version "$APPS/Morph.app")" = "$NEW" ] && echo 1)" "$uout / $(tail -5 "$T/home-upd/Logs/Morph.log" 2>/dev/null)"
-check "…the old version goes to the Bin" "$([ "$after" -gt "$before" ] && echo 1)" "bin $before→$after"
+check "…the old version goes to the Bin" "$([ "$after" -gt "$before" ] && echo 1)" "bin ${before}→${after}"
 check "…and the new version is started" "$([ -n "$(morph_pids "$APPS")" ] && echo 1)" "$(ps ax | grep -i 'Morph.app' | head -5)"
 stop_morph "$APPS"
 printf '%064d  Morph-mac.zip\n' 0 > "$SRV/rel/v$NEW/Morph-mac.zip.sha256"
@@ -112,7 +112,7 @@ sleep 1
 after=$(ls "$HOME/.Trash" 2>/dev/null | grep -c '^Morph' || true)
 check "uninstall removes Morph's settings and log, by name" "$([ ! -e "$H/Support/settings.json" ] && [ ! -e "$H/Support/login-item-added" ] && [ ! -e "$H/Logs/Morph.log" ] && echo 1)" "$nout / $(ls -la "$H/Support" "$H/Logs")"
 check "…keeps a file that is not Morph's, and its folder" "$([ -f "$H/Support/yours.txt" ] && echo 1)" "$(ls -la "$H/Support")"
-check "…and moves Morph.app to the Bin" "$([ ! -e "$APPS/Morph.app" ] && [ "$after" -gt "$before" ] && echo 1)" "$nout / bin $before→$after"
+check "…and moves Morph.app to the Bin" "$([ ! -e "$APPS/Morph.app" ] && [ "$after" -gt "$before" ] && echo 1)" "$nout / bin ${before}→${after}"
 
 note "install-update-uninstall" "$(printf '%s ; ' "${checks[@]}")"
 printf '%s\n' "${checks[@]}" > "$OUT/install-update-uninstall.txt"
