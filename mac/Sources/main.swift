@@ -11,13 +11,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ note: Notification) {
         Log.url = paths.log
+        startWhenAlone(tries: 0)
+    }
+
+    /// One Morph at a time. Right after an update the old one is still quitting: wait a few seconds for it.
+    private func startWhenAlone(tries: Int) {
         let me = NSRunningApplication.current
-        if let id = Bundle.main.bundleIdentifier,
-           NSRunningApplication.runningApplications(withBundleIdentifier: id).contains(where: { $0 != me }) {
+        let others = Bundle.main.bundleIdentifier.map { id in NSRunningApplication.runningApplications(withBundleIdentifier: id).filter { $0 != me } } ?? []
+        if !others.isEmpty {
+            if tries < 30 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.startWhenAlone(tries: tries + 1) }; return }
             Log.write("[morph] already running")
             NSApp.terminate(nil)
             return
         }
+        start()
+    }
+
+    private func start() {
         try? FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         bridge = Bridge(paths: paths)
         panel = Panel()

@@ -87,7 +87,7 @@ codesign --force --sign - "$T/new/Morph.app" >/dev/null 2>&1
 mkdir -p "$T/home-upd"
 before=$(ls "$HOME/.Trash" 2>/dev/null | grep -c '^Morph' || true)
 uout=$(MORPH_HOME="$T/home-upd" MORPH_RELEASES_URL=http://127.0.0.1:8765/rel/ alarm 120 "$APPS/Morph.app/Contents/MacOS/Morph" --lab-update "$NEW" 2>&1); ucode=$?
-sleep 3
+for i in 1 2 3 4 5 6 7 8 9 10; do [ -n "$(morph_pids "$APPS")" ] && break; sleep 1; done
 after=$(ls "$HOME/.Trash" 2>/dev/null | grep -c '^Morph' || true)
 check "the updater downloads $NEW, checks it and puts it in place" "$([ $ucode = 0 ] && [ "$(plist_version "$APPS/Morph.app")" = "$NEW" ] && echo 1)" "$uout / $(tail -5 "$T/home-upd/Logs/Morph.log" 2>/dev/null)"
 check "…the old version goes to the Bin" "$([ "$after" -gt "$before" ] && echo 1)" "bin ${before}→${after}"
