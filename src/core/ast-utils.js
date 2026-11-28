@@ -194,4 +194,32 @@ FB.cleanSlackLink = function cleanSlackLink(href, text) {
   const isUser = /^https?:\/\/[^/]*slack\.com\/team\/[UW][A-Z0-9]+/i.test(h);
   return { href: h, label: label.trim(), isUser };
 };
+
+// Links and images from a copy can come from any web page. Only web, email and phone links stay links, and only
+// web images stay images: a javascript:, data:, vbscript: or file: link (in any spelling: upper case, spaces or
+// invisible characters inside) keeps its text and loses the link, so Morph never hands another app a link that
+// runs code.
+const SAFE_LINK = /^(https?:|mailto:|tel:)/;
+FB.safeUrl = function safeUrl(u, images) {
+  const flat = String(u || '').replace(/[\u0000-\u0020\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u2064\ufeff]/g, '').toLowerCase();
+  if (!flat) return false;
+  if (images) return /^https?:/.test(flat);
+  if (SAFE_LINK.test(flat)) return true;
+  // No scheme at all (a relative link or "www.…"): fine. Anything with a scheme that isn't listed above: not.
+  return !/^[a-z][a-z0-9+.-]*:/.test(flat);
+};
+FB.safeLinks = function safeLinks(node) {
+  if (!node || !Array.isArray(node.children)) return node;
+  const out = [];
+  node.children.forEach((c) => {
+    if (c && c.type === 'link' && !FB.safeUrl(c.href)) { (c.children || []).forEach((k) => out.push(k)); return; }
+    if (c && c.type === 'image' && !FB.safeUrl(c.src, true)) { if (c.alt) out.push(FB.text(c.alt)); return; }
+    FB.safeLinks(c);
+    out.push(c);
+  });
+  node.children = out;
+  // Links with nothing left inside may hold more links (a link inside a link): check again once.
+  if (out.some((c) => c && c.type === 'link' && !FB.safeUrl(c.href))) FB.safeLinks(node);
+  return node;
+};
 })();

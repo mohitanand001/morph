@@ -484,11 +484,16 @@ function findCloser(src, from, ch, n) {
   return fallback;
 }
 
+// A link's text and address are short. Looking only this far keeps a page full of "[" from taking time that
+// grows with the square of its length (each "[" would otherwise scan to the end).
+const LINK_TEXT_MAX = 1000;
+const LINK_URL_MAX = 4096;
 function matchLink(src, start) {
   // [text](url "title")
   let depth = 0;
   let k = start;
-  for (; k < src.length; k++) {
+  const textEnd = Math.min(src.length, start + LINK_TEXT_MAX);
+  for (; k < textEnd; k++) {
     if (src[k] === '\\') {
       k++;
       continue;
@@ -504,7 +509,8 @@ function matchLink(src, start) {
   let p = k + 2;
   let parens = 1;
   let urlPart = '';
-  for (; p < src.length; p++) {
+  const urlEnd = Math.min(src.length, p + LINK_URL_MAX);
+  for (; p < urlEnd; p++) {
     if (src[p] === '(') parens++;
     if (src[p] === ')') {
       parens--;

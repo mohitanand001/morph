@@ -57,6 +57,7 @@ E.toAst = function toAst(html, text, source) {
         ast = source === 'code-editor' ? { type: 'doc', children: [{ type: 'codeBlock', content: t.trim() }] } : FB.markdownToAst(t);
       }
     }
+    FB.safeLinks(ast); // before anything else looks at it: no link that runs code survives
     FB.liftStructure(ast);
     FB.repairListParagraphs(ast);
     const l = ast.lifted || {};

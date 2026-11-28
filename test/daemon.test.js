@@ -392,6 +392,12 @@ const rowFor = (spec, label) => flat(spec).find((o) => o.label === label);
     await c2.start({ app: 'org.keepassxc.KeePassXC', title: 'KeePassXC', secret: false });
     check('at start, what a password manager left on the clipboard is not read', c2.state.original === null);
   }
+  {
+    const d = desk({ saved: '{"__proto__": {"polluted": true}, "constructor": {"prototype": {"polluted2": true}}, "setupDone": true}' });
+    const c = createCore(d.io);
+    await c.start(null);
+    check('a settings file cannot change how objects behave (no prototype pollution)', ({}).polluted === undefined && ({}).polluted2 === undefined && Object.getPrototypeOf(c.state.settings || {}) === Object.prototype);
+  }
   console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed (daemon)');
   process.exit(failed ? 1 : 0);
 })();

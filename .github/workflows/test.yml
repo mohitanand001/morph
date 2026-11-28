@@ -2,12 +2,15 @@ name: tests
 on:
   push:
   pull_request:
+# Read-only: tests never need to write to the repository, so a compromised step can't either.
+permissions:
+  contents: read
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
       - run: npm install --no-save --ignore-scripts playwright@1.63.0
@@ -18,8 +21,8 @@ jobs:
   lab:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
       - run: |
@@ -27,7 +30,7 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
             gnome-shell gjs dbus dbus-x11 mutter gir1.2-gtk-4.0 librsvg2-common fonts-cantarell adwaita-icon-theme
       - run: sudo -E env "PATH=$PATH" node test/lab/run.js
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: morph-lab-report

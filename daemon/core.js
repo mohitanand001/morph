@@ -119,7 +119,10 @@ function createCore(io) {
   function load() {
     let saved = null;
     try { const t = io.store.read(); saved = t ? JSON.parse(t) : null; } catch (e) { saved = null; }
-    settings = Object.assign({}, SETTINGS_DEFAULT, saved && typeof saved === 'object' ? saved : {});
+    // Own keys only, never __proto__ / constructor / prototype (a settings file can't change how objects behave).
+    const clean = {};
+    if (saved && typeof saved === 'object' && !Array.isArray(saved)) Object.keys(saved).forEach((k) => { if (!/^(__proto__|constructor|prototype)$/.test(k)) clean[k] = saved[k]; });
+    settings = Object.assign({}, SETTINGS_DEFAULT, clean);
     settings.rules = normalizeRules(settings.rules);
     const merged = addNewDefaults(settings.rules, settings.seenDefaults);
     settings.rules = merged.rules;

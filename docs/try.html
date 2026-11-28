@@ -360,6 +360,34 @@ FB.cleanSlackLink = function cleanSlackLink(href, text) {
   const isUser = /^https?:\/\/[^/]*slack\.com\/team\/[UW][A-Z0-9]+/i.test(h);
   return { href: h, label: label.trim(), isUser };
 };
+
+// Links and images from a copy can come from any web page. Only web, email and phone links stay links, and only
+// web images stay images: a javascript:, data:, vbscript: or file: link (in any spelling: upper case, spaces or
+// invisible characters inside) keeps its text and loses the link, so Morph never hands another app a link that
+// runs code.
+const SAFE_LINK = /^(https?:|mailto:|tel:)/;
+FB.safeUrl = function safeUrl(u, images) {
+  const flat = String(u || '').replace(/[\u0000-\u0020\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u2064\ufeff]/g, '').toLowerCase();
+  if (!flat) return false;
+  if (images) return /^https?:/.test(flat);
+  if (SAFE_LINK.test(flat)) return true;
+  // No scheme at all (a relative link or "www.…"): fine. Anything with a scheme that isn't listed above: not.
+  return !/^[a-z][a-z0-9+.-]*:/.test(flat);
+};
+FB.safeLinks = function safeLinks(node) {
+  if (!node || !Array.isArray(node.children)) return node;
+  const out = [];
+  node.children.forEach((c) => {
+    if (c && c.type === 'link' && !FB.safeUrl(c.href)) { (c.children || []).forEach((k) => out.push(k)); return; }
+    if (c && c.type === 'image' && !FB.safeUrl(c.src, true)) { if (c.alt) out.push(FB.text(c.alt)); return; }
+    FB.safeLinks(c);
+    out.push(c);
+  });
+  node.children = out;
+  // Links with nothing left inside may hold more links (a link inside a link): check again once.
+  if (out.some((c) => c && c.type === 'link' && !FB.safeUrl(c.href))) FB.safeLinks(node);
+  return node;
+};
 })();
 
 // ---- core/lift.js
@@ -2437,11 +2465,16 @@ function findCloser(src, from, ch, n) {
   return fallback;
 }
 
+// A link's text and address are short. Looking only this far keeps a page full of "[" from taking time that
+// grows with the square of its length (each "[" would otherwise scan to the end).
+const LINK_TEXT_MAX = 1000;
+const LINK_URL_MAX = 4096;
 function matchLink(src, start) {
   // [text](url "title")
   let depth = 0;
   let k = start;
-  for (; k < src.length; k++) {
+  const textEnd = Math.min(src.length, start + LINK_TEXT_MAX);
+  for (; k < textEnd; k++) {
     if (src[k] === '\\') {
       k++;
       continue;
@@ -2457,7 +2490,8 @@ function matchLink(src, start) {
   let p = k + 2;
   let parens = 1;
   let urlPart = '';
-  for (; p < src.length; p++) {
+  const urlEnd = Math.min(src.length, p + LINK_URL_MAX);
+  for (; p < urlEnd; p++) {
     if (src[p] === '(') parens++;
     if (src[p] === ')') {
       parens--;
@@ -3803,6 +3837,7 @@ E.toAst = function toAst(html, text, source) {
         ast = source === 'code-editor' ? { type: 'doc', children: [{ type: 'codeBlock', content: t.trim() }] } : FB.markdownToAst(t);
       }
     }
+    FB.safeLinks(ast); // before anything else looks at it: no link that runs code survives
     FB.liftStructure(ast);
     FB.repairListParagraphs(ast);
     const l = ast.lifted || {};
