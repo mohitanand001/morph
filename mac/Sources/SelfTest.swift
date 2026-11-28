@@ -64,8 +64,11 @@ final class SelfTest: NSObject, NSApplicationDelegate {
         recognizeTable { [weak self] in
             // 5. The panel page.
             self?.panelTest {
-                // 6. PDF.
-                self?.pdfTest(paths) { self?.finish() }
+                // 6. A whole copy → convert, through the running app.
+                self?.flowTest {
+                    // 7. PDF.
+                    self?.pdfTest(paths) { self?.finish() }
+                }
             }
         }
     }
@@ -129,6 +132,40 @@ final class SelfTest: NSObject, NSApplicationDelegate {
                 }
                 self.check("the panel is painted in Morph's colours (\(Int(painted * 100))% cream)", painted > 0.3)
                 next()
+            }
+        }
+    }
+
+    private func flowTest(then next: @escaping () -> Void) {
+        var sizes: [[String: Any]] = []
+        panel.onMessage = { m in if m["type"] as? String == "size" { sizes.append(m) } }
+        // As if another app copied Markdown.
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString("## Plan\n\n- **ship** it\n- test", forType: .string)
+        // The welcome card first (a new install): "Got it", as a person would.
+        bridge.action("setup:ok")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self = self else { return }
+            self.bridge.action("fix:slack")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                let r = Clip.read()
+                let t = Clip.types()
+                let text = r["text"] as? String ?? "", html = r["html"] as? String ?? ""
+                self.check("a copy from another app is read and converted for Slack", text.contains("*ship*") && html.lowercased().contains("<b>ship</b>") || html.lowercased().contains("<strong>ship</strong>"), text + " | " + String(html.prefix(200)))
+                self.check("…with HTML, RTF and text, marked as Morph's", t.contains("public.html") && t.contains("public.rtf") && t.contains("public.utf8-plain-text") && t.contains("dev.morph.own"), t.joined(separator: ","))
+                // Open the panel: click the tab.
+                self.panel.web.evaluateJavaScript("(function(){var t=document.querySelector('.tab'); if(!t) return 'no tab'; var r=t.getBoundingClientRect(); var o={bubbles:true,button:0,screenX:5,screenY:5,clientX:r.left+5,clientY:r.top+20}; t.dispatchEvent(new MouseEvent('mousedown',o)); window.dispatchEvent(new MouseEvent('mouseup',o)); return 'ok';})()") { res, _ in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        let last = sizes.last ?? [:]
+                        self.check("a click on the tab opens the panel at its width", (last["mode"] as? String) == "panel" && (last["w"] as? NSNumber)?.intValue == 296 && Int(self.panel.window.frame.width) == 296, "\(res ?? "") \(Json.string(last)) \(self.panel.window.frame)")
+                        self.panel.web.evaluateJavaScript("document.querySelector('.panel') ? document.querySelector('.panel').innerText : ''") { txt, _ in
+                            let s = txt as? String ?? ""
+                            self.check("the panel shows the copy and the apps", s.contains("Slack") && s.contains("Jira") && s.contains("Save as PDF"), String(s.prefix(300)))
+                            next()
+                        }
+                    }
+                }
             }
         }
     }
